@@ -1,5 +1,5 @@
 interface:
-  display_name: "模块功能整理"
+  display_name: "模块功能整理 v0.0.1"
   short_description: "分析角色与页面业务、字段和按钮权限，提出优化建议并持续维护可追溯的 AI 模块文档"
   default_prompt: "请使用 $code-module-feature-map 梳理指定模块：谁在什么页面操作什么功能、字段含义与映射、按钮显示和执行权限、优化建议，并创建或增量更新项目 AI 文档，标注代码证据与待确认项。"
 policy:
