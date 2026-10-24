@@ -1,0 +1,7 @@
+interface:
+  display_name: "模块功能底图"
+  short_description: "梳理业务功能与代码位置的对应关系，追踪模块职责、功能入口、调用链和数据访问"
+  default_prompt: "请使用 $module-feature-map 梳理当前项目的业务功能、模块职责、关键入口、调用链及对应代码位置，并标注证据与待确认项。"
+policy:
+  allow_implicit_invocation: false
+
