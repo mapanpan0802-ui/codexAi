@@ -1,7 +1,7 @@
 interface:
   display_name: "模块功能整理 v0.0.1"
-  short_description: "分析角色与页面业务、字段和按钮权限，提出优化建议并持续维护可追溯的 AI 模块文档"
-  default_prompt: "请使用 $code-module-feature-map 梳理指定模块：谁在什么页面操作什么功能、字段含义与映射、按钮显示和执行权限、优化建议，并创建或增量更新项目 AI 文档，标注代码证据与待确认项。"
+  short_description: "梳理业务流程、Map 字段与按钮权限地址，交付开发者说明及可持续更新的 AI 接手文档"
+  default_prompt: "请使用 $code-module-feature-map 整理指定项目模块，生成两份文档：开发者功能说明（业务流程、Map 字段、页面动作请求地址与显示权限）和 AI 接手上下文（当前实现、代码入口、约束、修改影响与验证方法），附证据和待确认项。"
 policy:
   allow_implicit_invocation: false
 
