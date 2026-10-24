@@ -1,7 +1,7 @@
 interface:
   display_name: "模块功能整理 v0.0.1"
   short_description: "梳理业务流程、Map 字段、按钮功能与可用条件及相关统计报表，交付两份模块文档"
-  default_prompt: "请使用 $code-module-feature-map 整理指定项目模块，生成开发者功能说明和 AI 接手上下文：流程图与功能表对应，分析 Map 字段，列举按钮功能与可用条件，并用报表名称、报表链接、简述三列列举相关统计报表；附代码依据，缺口就地注明，不生成独立验证结果、待确认与维护章节。"
+  default_prompt: "请使用 $code-module-feature-map 整理指定项目模块，生成供开发者快速理解模块的说明和自包含 AI 上下文；后续 AI 仅读取 AI 上下文作为模块文档，完成功能更新后同步维护两份输出：流程图与功能表对应，分析 Map 字段，列举按钮功能与可用条件，并用报表名称、报表链接、简述三列列举相关统计报表；附代码依据，缺口就地注明，不生成独立验证结果、待确认与维护章节。"
 policy:
   allow_implicit_invocation: false
 
