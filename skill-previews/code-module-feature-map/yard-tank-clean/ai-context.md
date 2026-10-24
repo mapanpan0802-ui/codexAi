@@ -1,125 +1,352 @@
 ---
 schema_version: 1
 module_id: yard-tank-clean
-analysis_id: yard-tank-clean-20261024
+analysis_id: yard-tank-clean-20261024-r2
 document_type: ai-context
 status: sample-feedback-pending
 source_root: /www/yard/web
 source_commit: 47c33b90efd47975f059431c221e30a20eec9553
 source_dirty: true
 source_changes: [AGENTS.md]
+source_rules_sha256: 070ec4f5d1339b41147f22c45dd51eb8478602f6dad5c15e46008f220b818b22
 verified_date: 2026-10-24
 timezone: Asia/Shanghai
 verification: static-code
 coverage: partial
-developer_document: developer-guide.md
 ---
 
-# 槽罐车业务：AI 接手上下文
+# 槽罐车业务：AI 开发上下文
 
-用途：新 AI 接手槽罐车清洗模块时，快速找到实现、现状和修改影响。详细业务流程、31项功能、33组字段、Map、页面按钮与报表入口见 [developer-guide.md](/www/ai/skill-previews/code-module-feature-map/yard-tank-clean/developer-guide.md)。6张流程图使用字母及分支数字后缀编号，功能表通过“流程图/节点”对应图中字母，并标注操作端，稳定功能 ID 仍用 F-xxx，按钮沿用 BTN-xxx 关联功能；编号数量不表示全项目覆盖率。
+本文件是后续 AI 开发的独立模块上下文，包含当前事实、稳定编号和代码证据。无需读取面向开发者的说明；源码与项目规范仍须按当前任务核对。
 
-本文是已核对代码的快照。新的需求、候选建议、测试方案和历史记录均不自动授权开发、业务操作或数据库写入；接手后先读取当前任务和目标项目规范。
+## 1. 范围、路径与开发前提
 
-## 1. 当前范围与快速结论
+已分析后台预约与统计页签、司机预约表单/列表详情、工人作业列表/详情、图片与证明、快捷财务，以及专项账单内槽罐车导出。后台源码入口为 `yard/extraOpe/tankCleanOrder` 的 AMIS 配置，移动端为 Uni-App。通用财务、司机/车牌维护及通用文件上传只沿本模块调用边界分析，未完整展开。[E-001～E-016]
 
-- 源项目 `/www/yard/web`，基线见 YAML；本次业务代码与提交一致，工作区仅 `AGENTS.md` 有未提交修改。`coverage=partial` 表示槽罐车主要端到端入口已静态核对，但财务通用服务、线上授权、实际数据库和运行验证不完整。
-- 主体是槽罐车清洗，不是箱罐列表，也不是整个收入管理模块。电脑端在 AMIS `public/backend/pages/`，司机/工人端在 Uni-App 页面。
-- 正常状态链：待确认 `1` → 确认后待开始 `2` → 开始后清洗中 `3` → 完成 `9`；撤销 `8` 与删除不是同一动作。
-- 收入 `type=5`，关联 `connect_id=预约ID`；专项账单 `source_type=12`，两种类型不要混用。
-- 作业与财务没有强制单一串行顺序；先收款后开票会产生已登记日记账但尚未核销的中间状态。
+依据源码静态复核；业务代码与元数据中的提交一致，源工作区仅 `AGENTS.md` 有未提交修改。没有调用业务接口、登录运行页面、查询实际数据库或执行迁移。实际部署入口、角色/岗位绑定、线上表结构及客户端效果尚未核验，不把代码分析当作运行通过。
 
-## 2. 建议阅读顺序与代码地图
+输出路径（仅用于定位写入目标，不要求回读）：
 
-| 顺序 | 位置/符号 | 接手用途 |
-| --- | --- | --- |
-| 1 | [目标项目规则](/www/yard/web/AGENTS.md)、[已有槽罐车说明](/www/yard/web/docs/m/b-m-tank-clean.md) | 按项目约定开发；旧说明作为线索，与当前实现核对，不能照搬已过时结论 |
-| 2 | [AMIS主页面](/www/yard/web/public/backend/pages/yard/extraOpe/tankCleanOrder.js:4) | 预约、财务表单、Map、工具栏、行操作、图片及统计全部在此文件 |
-| 3 | [后台控制器](/www/yard/web/app/controller/backend/yard/extraOpe/TankCleanOrderController.php:103) | `fillFinanceState()` 生成按钮控制标志；`detail()` 负责费用回显；核对真实返回值而非仅看方法注释 |
-| 4 | [核心服务](/www/yard/web/app/common/service/basic/yard/extraOpe/TankCleanOrderService.php:140) | 事务、状态迁移、财务联动、删除约束、报表与证明 |
-| 5 | [模型](/www/yard/web/app/common/model/yard/extraOpe/TankCleanOrderModel.php:21)、[验证器](/www/yard/web/app/common/validate/yard/extraOpe/TankCleanOrderValidate.php:29) | 实际表映射、关联、搜索器、分端必填及后端校验 |
-| 6 | [司机表单](/www/yard/web/npm/mobile-cli/src/pages/driver/tankClean/form.vue:143)、[司机列表/详情](/www/yard/web/npm/mobile-cli/src/pages/driver/tankClean/list.vue:89)、[司机控制器](/www/yard/web/app/controller/driver/extraOpe/TankCleanOrderController.php:73) | 默认值、草稿、司机提交字段白名单与归属检查 |
-| 7 | [工人列表](/www/yard/web/npm/mobile-cli/src/pages/worker/tankClean/list.vue:38)、[工人详情](/www/yard/web/npm/mobile-cli/src/pages/worker/tankClean/detail.vue:28)、[工人控制器](/www/yard/web/app/controller/api/worker/TankCleanOrderController.php:29) | 工人三种状态入口、开始/完成和图片上传 |
-| 8 | [工人图片入口](/www/yard/web/app/controller/api/worker/TankCleanOrderImageController.php:28)、[后台图片入口](/www/yard/web/app/controller/backend/yard/extraOpe/TankCleanOrderImageController.php:26)、[图片服务](/www/yard/web/app/common/service/basic/yard/extraOpe/TankCleanOrderImageService.php:43) | 两端上传校验不同；本地/OSS、归属与软删除 |
-| 9 | [专项账单页](/www/yard/web/public/backend/pages/yard/finance/generalIncomeAccount.js:542)、[账单导出](/www/yard/web/app/common/service/basic/finance/income/IncomeAccountService.php:1077) | 合并导出的权限、来源约束和12列格式 |
-| 10 | [后台路由](/www/yard/web/app/common/route/backend/yardRoute.php:56)、[司机路由](/www/yard/web/app/common/route/driver/driverRoute.php:18)、[工人路由](/www/yard/web/app/common/route/api/workerRoute.php:12)、[权限种子](/www/yard/web/app/common/service/basic/platform/power/PowerService.php:437) | 方法存在、路由注册、菜单授权三者分开核对 |
+```yaml
+ai_context: /www/ai/skill-previews/code-module-feature-map/yard-tank-clean/ai-context.md
+developer_output: /www/ai/skill-previews/code-module-feature-map/yard-tank-clean/developer-guide.md
+```
 
-## 3. 当前实现中影响开发决策的事实
+先读 [项目规范](/www/yard/web/AGENTS.md)，再按需求检查 E-001/E-007～E-010 页面、E-016 路由、E-002/E-003 控制器服务、E-004/E-005 模型校验及共享依赖；AMIS配置是当前实际维护入口，不能因 public 目录名忽略。项目规范对数据库MCP仅允许查询，本次未查询数据库。
 
-### 3.1 状态与操作边界
+预约通过 `income_item_id` 关联收入；收入 `type=5`、`connect_id=预约ID`，费用归属槽罐车，收入日期取预约入场时间；专项账单 `source_type=12` 为另一类枚举。“已登记日记账”“收入已核销”“页面已有收款标志”可能不同；无需票分支的模拟发票只供内部核销，不是对外票据。[E-003、E-004、E-014]
 
-- F-003：`confirm()` 只校验原状态 `1` 并写 `2`；它不是“保存并确认”接口。当前方法描述包含同步表单等旧信息，不能据此扩展行为。
-- F-004/F-005：`start()` 要求 `2`，写 `3` 和开始时间；`complete()` 要求 `3`，写 `9`、结束时间及 `verify_time`。
-- F-013：普通编辑检查撤销和财务锁定；已完成但未锁财务的记录仍可能普通编辑。F-006 独立编辑时间不走这些财务锁，服务只排除撤销；页面单独限制完成状态。
-- F-009：司机页面只显示待确认取消；服务不限定原状态为 `1`，但拒绝 `8/9` 和收入已确认。电脑端 `cancel()` 方法存在，路由却未注册；司机路由仍可用。
-- F-015 / BTN-021：预约删除的服务还检查部分开票/收款，页面 `has_invoice/has_payment` 主要由关联对象及全额状态生成。删除预约及收入不等于级联撤销账单、发票、日记账和图片文件。
+## 2. 代码地图与证据定义
 
-### 3.2 字段与 Map 的易错点
-
-- FIELD-006：车挂在电脑创建为可选，在司机提交为必填；不要只看通用 `checkOptionalPositive()` 推断所有端一致。
-- FIELD-007：`plate_number` 是关联拼接展示值，模型无同名搜索器；方法参数注释写了车牌关键字也不证明筛选已经实现。
-- FIELD-009：货类数值相同但展示方法不同：电脑/司机 `getDesc()`，工人/账单导出 `getNumberedDesc()`。`20` 普货不带编号。
-- FIELD-019：`IN_PROGRESS=1` 当前含义为待确认，不是清洗中；清洗中是 `STARTED=3`。
-- FIELD-021：支付方式常量 `ALIPAY/CASH/OTHER` 当前文案为扫码/对公转账/月结；`WECHAT=1` 存在且会通过 cases 校验，但 `label()` 返回 `-`。勿按常量名或旧迁移注释重写业务。
-- FIELD-026：费用对象中的 `need_invoice` 必须明确；页面默认、司机提交转换、验证器与服务归一逻辑分开看。
-- FIELD-028/FIELD-031：本模块费用创建使用自己的一套默认与计算；四位中间精度与两位 UI 显示不代表数据库精度。更新收入还会进入通用收入服务及模型钩子。
-- `invoice_state_format/collection_state_format` 是派生字符串，不是原始状态。页面虽然有“部分”Map，当前 `fillFinanceState()` 并不直接产生对应部分状态文案。
-
-### 3.3 页面权限与后端允许执行
-
-- 后台前缀 `yardExtraOpe.tankCleanOrder.`，按 `read/add/edit/confirm/start/complete/del` 分别判断。
-- BTN-008/009：图片弹窗需要父入口 `read`，内部上传/删图另需要 `edit`。不能仅复制子按钮表达式而遗漏父容器。
-- BTN-018/020：开票/重传/收款按钮无额外财务权限表达式，依赖 `can_*`。这些标志由控制器计算，必须与服务校验一起阅读。
-- `can_invoice` 有两个 OR 分支，第二个分支是无需开票且有收款无发票；开票服务又明确拒绝无需开票。页面对撤销状态的隐藏，也没有对应为模块 `invoice/collection` 方法中的显式撤销校验；不能假定 UI 与后端完全一致，共享财务服务约束须另行复核。
-- 工人 API 登录中间件不等于细分岗位授权证明。司机详情/取消有明确 `driver_id+corp_id` 检查；后端普通数据范围仍需理解基础服务。
-- BTN-034：账单导出接受两种导出权限之一，且批量动作是否被构造还受固定来源控制。不能把通用账单导出条件照搬到槽罐车清洗主页面。
-
-### 3.4 财务、图片及证明
-
-- F-007：首次快捷开票创建并确认专项账单，再登记实际发票；如已存在账单，内部创建账单会拒绝。F-014 重传发票在已全额开票时仅更新预约独立关联的发票，不替代通用发票操作。
-- F-008：收款创建日记账；需开票未开时暂不核销，后开票时尝试自动核销。无需开票时创建模拟发票参与核销，模拟发票不是对外实际票据。
-- F-016：工人上传需要 `state∈{3,9}`，后台图片入口没有同等状态限制。手机 `uploadNext()` 当前只处理传输 success/fail，未检查响应业务状态。
-- F-019/F-020：证明接口会生成文件，本轮未调用。证明的 `0.5Bar`、是否有压及固定声明来自模板/清洗类型，不是现场检测数据。当前接口和页面均未统一要求已完成。
-- F-012：统计未按币种分组、未默认只看已完成；`collection_amount` 是收入核销口径，先收未核销的现金不能直接计入。F-021 槽罐车账单导出12列，不复用旧格式的额外费用列。
-
-## 4. 按需求定位修改范围
-
-| 需求 | 优先检查 | 必须评估的关联影响 |
-| --- | --- | --- |
-| 修改预约字段/默认值/必填 | 两端表单、三类控制器、验证器及服务白名单 | 司机与后台输入差异、回显、收入嵌套字段、声明迁移及真实表结构 |
-| 调整状态/按钮权限 | 页面表达式、`fillFinanceState()`、服务状态校验、路由与权限来源 | 工人列表/详情重复入口、父容器条件、历史状态、直接 API 调用 |
-| 修改支付方式/货类/清洗选项 | 三份相关枚举、电脑表单、司机选项、后端校验 | 旧值兼容、工人展示、财务统计、账单导出、证明模板 |
-| 修改财务流程 | 本服务 `upsertIncomeItem/invoice/collection/_createAccount/autoWriteOff` | 通用收入/账单/发票/日记账服务、撤销状态、先收后票、重复请求和并发 |
-| 修改图片上传/删除 | 两端页面、两个图片控制器、图片服务与模型 | 业务错误反馈、状态/企业/归属校验、本地/OSS、软删与文件清理边界 |
-| 修改统计或导出 | `customStatistic()`、统计页签、`IncomeAccountService::exportTankCleanAccounts()` | 币种、核销口径、未设置客户、筛选透传、合并来源及Excel格式 |
-| 接通日志 | 主页面日志 source、当前 `log()`、现有日志字典与统一查询机制 | 当前方法固定空数组，不能只改配置或沿用旧文档“已接通”结论 |
-
-## 5. 已知问题、候选建议与需求状态
-
-候选建议 OPT-001～OPT-008 详见开发者文档：日志空实现、支付历史值、工人上传状态/反馈、权限与状态一致性、统计口径、缓存隔离及预约来源。
-
-本轮用户已确认的任务仅为“以槽罐车业务制作真实样例”。没有已批准的业务代码优化清单或下一版本功能计划；所有候选建议均未实施。正式样例验收标准与额外操作边界待用户反馈后明确。
-
-## 6. 后续开发验证方向
-
-当前文档以源码静态核对为基础。浏览器 AMIS 渲染、手机客户端流程、实际登录授权、请求返回、后端集成测试及实际数据库未核验；现有测试目录未发现明确的槽罐车专用自动化测试，不盲目运行可能写库的脚本。
-
-后续若用户授权实现相关需求，按影响范围选择隔离环境用例：
-
-| 用例方向 | 应核对的行为 |
+| 证据 ID | 真实代码入口与用途 |
 | --- | --- |
-| 正常主流程 | 两端创建 → 后台确认 → 工人开始/完成，核对状态与时间及收入关系 |
-| 字段/枚举边界 | 缺车挂的两端差异；支付 `1/2/3/4`；未知货类/状态；空时间与时间倒置 |
-| 权限/状态 | 无操作权限、父容器权限缺失、跨企业/司机、已撤销、已确认/部分及全部财务状态 |
-| 上传 | 待开始被拒、清洗中/已完成可传；HTTP/业务错误不能误显示整批成功；重复点击与部分成功 |
-| 财务 | 未设客户/零额、需票先收后开、无需开票、独立发票缺失、已有账单、重复/并发请求 |
-| 统计/文件 | 混币、未设置客户、先收未核销、跨来源合并、12列格式、未完成记录证明生成策略 |
-| 日志/缓存 | 请求是否返回真实日志；同设备切换司机是否残留草稿和最近车牌 |
+| E-001 | [后台主页面](/www/yard/web/public/backend/pages/yard/extraOpe/tankCleanOrder.js:4)：预约表单、工具栏、按钮表达式、图片、证明和统计页签 |
+| E-002 | [后台控制器](/www/yard/web/app/controller/backend/yard/extraOpe/TankCleanOrderController.php:33)：page/detail/fillFinanceState/fillInvoiceInfo/invoice/collection/log |
+| E-003 | [核心服务](/www/yard/web/app/common/service/basic/yard/extraOpe/TankCleanOrderService.php:140)：create/update/confirm/start/complete/cancel/delete；财务内部方法及customStatistic |
+| E-004 | [预约模型](/www/yard/web/app/common/model/yard/extraOpe/TankCleanOrderModel.php:21)：103_tank_clean_order、searchField与关联 |
+| E-005 | [预约验证器](/www/yard/web/app/common/validate/yard/extraOpe/TankCleanOrderValidate.php:29)：分端必填、手机号、枚举与费用对象 |
+| E-006 | [状态](/www/yard/web/app/common/enum/yard/extraOpe/TankCleanStateEnum.php:10)、[支付方式](/www/yard/web/app/common/enum/yard/extraOpe/TankCleanPayMethodEnum.php:10)、[需开票](/www/yard/web/app/common/enum/yard/extraOpe/TankCleanNeedInvoiceEnum.php:10)、[货类](/www/yard/web/app/common/enum/yard/extraOpe/TankCleanCargoCategoryEnum.php:10)：当前枚举标签、历史值及未知兜底 |
+| E-007 | [司机表单](/www/yard/web/npm/mobile-cli/src/pages/driver/tankClean/form.vue:143)：本地状态、默认值、选择器、缓存和submitForm |
+| E-008 | [司机列表/详情](/www/yard/web/npm/mobile-cli/src/pages/driver/tankClean/list.vue:89)、[司机控制器](/www/yard/web/app/controller/driver/extraOpe/TankCleanOrderController.php:73)：create/cancel/assertOwner与附件下载 |
+| E-009 | [工人列表](/www/yard/web/npm/mobile-cli/src/pages/worker/tankClean/list.vue:38)、[工人控制器](/www/yard/web/app/controller/api/worker/TankCleanOrderController.php:29)：page/detail/start/complete |
+| E-010 | [工人详情](/www/yard/web/npm/mobile-cli/src/pages/worker/tankClean/detail.vue:28)：状态入口、chooseImage/uploadNext/preview |
+| E-011 | [工人图片控制器](/www/yard/web/app/controller/api/worker/TankCleanOrderImageController.php:28)：状态3/9、企业归属与来源写入 |
+| E-012 | [后台图片控制器](/www/yard/web/app/controller/backend/yard/extraOpe/TankCleanOrderImageController.php:26)、[图片服务](/www/yard/web/app/common/service/basic/yard/extraOpe/TankCleanOrderImageService.php:43)、[图片模型](/www/yard/web/app/common/model/yard/extraOpe/TankCleanOrderImageModel.php:16)：上传、本地/OSS、关联查询和软删除 |
+| E-013 | [证明服务](/www/yard/web/app/common/service/basic/yard/extraOpe/TankCleanOrderService.php:859)：generateCertificateImage/buildCertificateData/renderCertificateSvg |
+| E-014 | [专项账单导出按钮](/www/yard/web/public/backend/pages/yard/finance/generalIncomeAccount.js:542)、[账单导出分支](/www/yard/web/app/common/service/basic/finance/income/IncomeAccountService.php:534)、[12列构造](/www/yard/web/app/common/service/basic/finance/income/IncomeAccountService.php:1077)：固定来源、导出权限、通用export与槽罐车格式边界 |
+| E-015 | [菜单/权限定义](/www/yard/web/app/common/service/basic/platform/power/PowerService.php:437)、[角色权限解析](/www/yard/web/app/common/service/basic/platform/power/PowerService.php:86)：权限定义不等于已部署角色授权 |
+| E-016 | [通用路由](/www/yard/web/app/common/route/route.php:14)、[后台路由](/www/yard/web/app/common/route/backend/yardRoute.php:56)、[司机路由](/www/yard/web/app/common/route/driver/driverRoute.php:18)、[工人路由](/www/yard/web/app/common/route/api/workerRoute.php:12)、[手机请求封装](/www/yard/web/npm/mobile-cli/src/utils/request.js:15)：注册方法、统一前缀和请求方法 |
+| E-017 | [初始声明迁移](</www/yard/web/duration/v 3/v 3.0.4/v 3.0.4.sql:78>)、[增量声明迁移](</www/yard/web/duration/v 3/v 3.0.5/v 3.0.5.sql:34>)：仅静态读文件，未查询实际库或执行迁移 |
+| E-018 | [金额计算](/www/yard/web/app/common/tools/base/FinanceTool.php:42)、[基础查询范围](/www/yard/web/app/common/service/basic/BasicBaseService.php:51)、[API登录](/www/yard/web/app/common/middleware/login/ApiLoginCheckMiddleware.php:21)、[司机登录](/www/yard/web/app/common/middleware/login/DriverMiddleware.php:23)：计算精度、登录类型与查询范围约束 |
 
-## 7. 人工背景与决策
+### 2.1 接口与入参定位
 
-用户已要求以槽罐车业务制作真实样例，并按当前 skill 重新生成开发者说明。现行文档不再单列角色/页面操作矩阵；流程图使用 A-B-C-D、分支建议 A-B1-C1-D1，功能表对应图中字母并列明电脑/手机操作端；按钮表描述功能与可用条件，报表固定使用“报表名称、报表链接、简述”三列，不另附本轮验证报告或维护日志。
+| 入口 | 路由/前缀 | 方法 | 入参与边界 | 证据 |
+| --- | --- | --- | --- | --- |
+| 后台预约 | `/b/y/extraOpe/tankCleanOrder/` | page/detail/create/update/confirm/start/complete/updateTaskTime/invoice/collection/batchSetCustom/statistic/delete/options/log/certificate | 后台页面使用post前缀，通用route_map注册为Route::any；没有后台cancel路由 | E-001、E-002、E-016 |
+| 后台图片 | `/b/y/extraOpe/tankCleanOrderImage/` | page/create/delete/download | page用connect_id；上传带connect_id、img_type、file、remark；delete带图片id和connect_id；download有路由但页面按钮已注释 | E-001、E-012、E-016 |
+| 司机预约 | `/api/d/tankClean/` | page/create/detail/cancel | 手机调用/d/tankClean，由请求封装拼接baseUrl；create白名单和driver_id来源在控制器，不接受伪造其他司机 | E-007、E-008、E-016 |
+| 工人作业 | `/api/worker/tankClean/` | page/detail/start/complete | page注入企业、默认状态2且只允许2/3/9；其余控制器须结合基础服务数据范围理解 | E-009、E-018 |
+| 工人图片 | `/api/worker/tankCleanImage/create` | create | multipart：id、img_type、file、remark；显式企业检查并限定3/9 | E-010、E-011、E-016 |
+| 发票附件 | `/b/p/upload/file` | 通用文件上传 | 先上传取得路径，再在invoice中提交invoice_img、invoice_number和remark；上传不等于开票成功 | E-001、E-002 |
+| 专项账单 | `/b/y/finance/incomeAccount/export` | export | 带所选账单id集合，服务按来源分派，来源12走槽罐车专用格式 | E-014 |
 
-本轮未提供已批准的业务代码优化清单或下一版本功能计划；OPT-001～OPT-008 均为候选建议。正式样例验收标准待用户反馈，不能用静态分析替代业务验收。
+## 3. 功能事实与规则
 
-后续使用本文前重新核对源项目规范、代码基线及工作区变化；保留现有功能/字段/按钮/建议/证据编号和人工决策。实际授权与数据库缺口见第1、3节，外部档案和通用财务边界见开发者说明第1、2节；不使用其他项目数据库替代堆场核验。
+下表独立定义全部功能ID；“对应流程图/节点”是生成面向人说明时的呈现位置，不依赖读取该图才能理解当前功能。正常状态链为1→2→3→9，取消为8；图片、证明、财务、统计及维护不是主流程的强制串行步骤。
+
+| 功能 ID | 对应流程图/节点 | 功能名称 | 操作端 | 前置条件 | 处理与结果 | 接口/入口 | 证据 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| F-001 | FLOW-MAIN / A | 司机创建预约 | 手机 | 登录司机；车头、车挂、入场时间必填，页面须勾真实性承诺 | 注入司机、来源1，默认月结/普货；同步司机资料并创建预约及费用收入 | 司机 create → workerCreate/create | E-003、E-005、E-007、E-008 |
+| F-002 | FLOW-MAIN / A1 | 电脑创建预约 | 电脑 | 新建权限；司机、车头、入场时间必填，客户可暂不填 | 事务内创建预约及传入的关联收入，正常页面提交进入待确认 | 后台 create → service::create | E-001～E-005 |
+| F-003 | FLOW-MAIN / B | 确认预约 | 电脑 | 确认权限且原状态为1 | 只将1改为2，不保存预约/财务表单内容 | 后台 confirm → service::confirm | E-001～E-003 |
+| F-004 | FLOW-MAIN / C | 开始任务 | 电脑、手机 | 原状态为2；后台需开始权限；手机受登录与数据范围约束 | 将2改为3，写当前开始时间 | 后台/工人 start → service::start | E-001、E-003、E-009、E-018 |
+| F-005 | FLOW-MAIN / D | 完成任务 | 电脑、手机 | 原状态为3；后台需完成权限；手机受登录与数据范围约束 | 将3改为9，写当前结束时间及 verify_time，不能跳过开始 | 后台/工人 complete → service::complete | E-001、E-003、E-009、E-018 |
+| F-009 | FLOW-MAIN / B1 | 取消预约 | 手机 | 司机页面仅状态1显示；接口校验本人和企业；服务拒绝8/9及收入已确认 | 改为8，不是删除；服务未限定只能从1取消 | 司机 cancel → service::cancel；后台同名方法未注册路由 | E-003、E-008、E-016 |
+| F-013 | FLOW-MAINTAIN / A | 普通编辑预约 | 电脑 | 编辑权限、非撤销，收入未确认/未全额开票/未全额收款 | 事务内维护预约及关联收入；已完成但未锁财务仍可编辑 | 后台 update → assertEditable/upsertIncomeItem | E-001～E-005 |
+| F-006 | FLOW-MAINTAIN / A1 | 编辑时间与支付方式 | 电脑 | 页面要求编辑权限及状态9；服务只拒绝撤销 | 不走普通财务锁；缺时间键保留，空值清零，均非零时检查结束不早于开始 | 后台 updateTaskTime → 同名服务 | E-001～E-003 |
+| F-010 | FLOW-MAINTAIN / A2 | 批量设置客户 | 电脑 | 选中有效预约且客户ID大于0；拒绝撤销、无有效收入或收入已确认 | 事务内批量修改收入客户，不等于普通编辑完整锁定规则 | 后台 batchSetCustom → 同名服务 | E-001～E-003 |
+| F-015 | FLOW-MAINTAIN / A3 | 删除预约 | 电脑 | 删除权限，页面无已有发票/收款标志；服务还拒绝部分/全部开票收款及相关ID | 事务内软删除预约和关联收入，不级联撤销全部财务关系或物理删除图片 | 后台 delete → assertDeletableAndGetIncomeItem | E-001～E-003 |
+| F-007 | FLOW-FINANCE / A | 首次开票 | 电脑 | 有效收入/客户、需开票且未全额开票；页面排除撤销，已有账单会被内部创建步骤拒绝 | 创建并确认专项账单，再登记实际发票；有关联收款时尝试核销 | 后台 invoice → _createAccount/_createInvoice/autoWriteOff | E-001～E-003 |
+| F-008 | FLOW-FINANCE / A1 | 登记收款 | 电脑 | 收入和客户有效、金额大于0；收入收款状态为未收；页面另排除撤销和已有收款标志 | 创建日记账；需票未开暂挂，需票已全开则核销，无需票则创建账单和模拟发票后核销 | 后台 collection → _createPayment/autoWriteOff | E-001～E-003 |
+| F-014 | FLOW-FINANCE / A2 | 重传发票 | 电脑 | 收入/客户有效、需开票、已全额开票且有独立 invoice_id；页面另排除撤销 | 更新已有独立发票号码、附件、备注，不新建账单 | 后台 invoice 的全额开票分支 | E-001～E-003 |
+| F-011 | FLOW-MEDIA / A | 查看图片 | 电脑、手机 | 后台读取权限；工人详情受登录和基础查询数据范围约束 | 后台图片管理窗口，或工人详情内加载图片集合 | 后台图片 page / 工人 detail | E-001、E-009～E-012、E-018 |
+| F-016 | FLOW-MEDIA / B | 上传图片 | 电脑、手机 | 后台需父入口读取加编辑权限；工人后端限定3/9并显式校验企业、类型、文件 | 关联预约建立图片，后台来源2、工人来源1；工人最多选9张逐张上传 | 后台/工人图片 create | E-001、E-010～E-012 |
+| F-017 | FLOW-MEDIA / B1 | 删除图片 | 电脑 | 父入口读取加编辑权限；图片ID、预约关联和数据范围有效 | 软删除图片记录，不物理清理文件 | 后台图片 delete → deleteById | E-001、E-012、E-018 |
+| F-018 | FLOW-MEDIA / B2 | 预览图片 | 电脑、手机 | 已加载图片与地址；后台继承读取入口前提 | 后台大图弹窗或手机系统预览，不写业务记录 | 图片点击事件 / 工人 preview | E-001、E-010 |
+| F-019 | FLOW-MEDIA / C | 生成充氮证明 | 电脑 | 读取权限、有效预约；无已完成或已选充氮项目的显示限制 | 按模板/清洗类型生成并下载SVG，固定文字不是检测值 | certificate(type=nitrogen) → generateCertificateImage | E-001、E-013 |
+| F-020 | FLOW-MEDIA / C1 | 生成清洗证明 | 电脑 | 读取权限、有效预约；未要求作业已完成 | 根据预约与模板生成并下载SVG，不推进作业状态 | certificate(type=clean) → generateCertificateImage | E-001、E-013 |
+| F-022 | FLOW-QUERY / A | 查询预约 | 电脑、手机 | 页面登录及数据范围；工人列表只允许2/3/9、默认2 | 分页查询；司机限本人及企业；车牌为派生字段，无同名搜索器 | 三端 page；后台联动筛选/刷新 | E-001～E-004、E-008、E-009、E-018 |
+| F-023 | FLOW-QUERY / B | 查看预约详情 | 电脑、手机 | 后台读取权限；司机显式校验本人及企业；工人依赖基础查询数据范围 | 展示预约、财务或作业数据，不改变流程状态 | 三端 detail | E-001、E-002、E-008～E-010、E-018 |
+| F-028 | FLOW-QUERY / C | 查看日志 | 电脑 | 可进入后台详情抽屉 | 日志页签请求当前固定返回空数组的接口，未接入真实日志 | 后台 log | E-001、E-002 |
+| F-024 | FLOW-QUERY / D | 导出预约列表 | 电脑 | 可进入后台列表，局部控件未写独立导出权限/选择数条件 | 请求列表并按页面配置导出Excel，属于普通列表导出 | export-excel / page?is_export=1 | E-001、E-002 |
+| F-025 | FLOW-QUERY / E | 暂存本地草稿 | 手机 | 司机表单可访问，无正式预约必填校验前提 | 本机缓存草稿，隐藏/卸载时自动保存；成功提交清草稿，不创建预约 | saveDraft/loadDraft/clearDraft | E-007 |
+| F-026 | FLOW-QUERY / F | 下载发票附件 | 手机 | 本人详情存在附件且地址非空 | H5新窗口；其他端下载后预览图片或打开文档 | 司机 downloadInvoice | E-008 |
+| F-012 | FLOW-QUERY / G | 客户统计 | 电脑 | 统计页签可访问，按客户/司机/入场时间/车队/状态筛选 | 按收入客户汇总，缺客户归未设置客户；不强制已完成，不分币种或换汇 | statistic → customStatistic | E-001～E-003 |
+| F-027 | FLOW-QUERY / I | 查看客户明细 | 电脑 | 统计行客户ID大于0 | 携带客户及当前筛选打开预约明细，是统计下钻 | 客户详情 → 后台 page | E-001 |
+| F-021 | FLOW-QUERY / J | 导出槽车记录表 | 电脑 | 满足导出权限及页面来源条件，选中来源12的有效账单，收入类型5且预约关联有效 | 生成12列专用Excel；通用export对单选其他来源可走其他格式，页面未逐项限定选择类型 | 专项账单槽罐车导出 → exportTankCleanAccounts | E-014 |
+| F-029 | FLOW-REFERENCE / A | 快捷新增司机 | 电脑 | 可打开新建/编辑预约表单；手机号必填且符合页面正则，外部接口校验通过 | 新增档案，回填司机/手机号并清空两类车牌；完整司机模块未展开 | 司机选择器 addApi/onEvent.addItem | E-001 |
+| F-030 | FLOW-REFERENCE / A1 | 快捷新增车头 | 电脑 | 可访问对应表单，车牌必填且符合车头正则，请求携带所选司机 | 创建类型1车牌供选择；有效司机等外部后端约束未完整展开 | 车头选择器 addApi | E-001 |
+| F-031 | FLOW-REFERENCE / A2 | 快捷新增车挂 | 电脑 | 可访问对应表单，车牌必填且符合车挂正则，请求携带所选司机 | 创建类型2车牌供选择；完整车牌模块约束未展开 | 车挂选择器 addApi | E-001 |
+
+### 3.1 财务派生标志与共享影响
+
+`fillFinanceState()` 的实际派生规则如下，都是业务标志而非角色授权结果：
+
+```text
+X=预约已撤销；H=存在收入；C=收入客户ID>0；N=need_invoice不等于2
+has_invoice = 有效关联发票存在 OR 收入全额开票
+has_payment = 有效关联日记账存在 OR 收入全额收款
+is_edit_locked = 收入已确认 OR 收入全额开票 OR 收入全额收款
+can_invoice = (!X AND H AND C AND N AND 未全额开票)
+              OR (!N AND has_payment AND !has_invoice)
+can_reupload_invoice = !X AND H AND C AND N AND 全额开票 AND invoice_id>0
+can_collection = !X AND H AND C AND !has_payment AND amount>0
+```
+
+最终开票/重传按钮另要求非撤销。部分开票/部分收款并不保证已有标志为真，删除服务会进一步拒绝部分状态和相关ID；开票第二OR分支的“无需票”与执行服务拒绝无需票并存。`is_income_locked` 只含收入已确认或全额收款，不要混同普通编辑的 `is_edit_locked`。[E-001～E-003]
+
+金额由本模块 `upsertIncomeItem()` 构建，调用 `FinanceTool::taxCompute`；不能把页面两位小数当作数据库精度。四位中间计算及普通收入服务钩子需同时核对。开票创建并确认账单后再登记发票；后续发票更新/撤销/并发的通用财务约束未完整覆盖。[E-003、E-018]
+
+## 4. 字段、默认值与 Map
+
+预约模型映射 `103_tank_clean_order`，图片模型映射 `103_tank_clean_order_image`。类型和长度来自模型、代码及声明迁移，未核实线上DDL；审计字段 `corp_id/user_id/admin_id/created_at/updated_at/deleted_at` 不当作普通页面业务输入。[E-004、E-012、E-017]
+
+`income_item` 是表单嵌套费用对象；详情将 `incomeItem` 关联转为适合回显的对象，不是两个数据库字段。手机 `truth_confirm` 只做本地承诺校验，不随请求保存；`clean_type_list` 本地多选数组转为 `clean_type` 提交，草稿不等于预约已创建。[E-001、E-002、E-007]
+
+### 4.1 预约字段
+
+| 字段 ID | 页面/请求字段 | 业务含义及来源 | 类型、默认与约束 | 证据 |
+| --- | --- | --- | --- | --- |
+| FIELD-001 | `id` | 预约标识，不同于图片ID或收入ID | 整数，动作接口校验有效ID | E-002、E-004 |
+| FIELD-002 | `order_no` | 业务单号 | 声明 varchar(40)，缺省由TC+年月日时分秒+三位随机数生成 | E-003、E-017 |
+| FIELD-003 | `driver_id` | 司机档案关联 | 后台必填；司机入口从登录态注入 | E-005、E-008 |
+| FIELD-004 | `driver_name/driver_mobile/fleet` | 由 driver.name/mobile/fleet 关联展示，不是预约同名快照 | 手机 driver_name/driver_mobile/driver_fleet 参与资料同步；手机非空手机号校验11位，电脑新增司机手机号必填 | E-001、E-003、E-005、E-007、E-008 |
+| FIELD-005 | `head_plate_id` | 车头档案ID | 两端必填；选择器按司机及车牌类型1取选项 | E-001、E-005、E-008 |
+| FIELD-006 | `trailer_plate_id` | 车挂档案ID | 电脑可选，司机页面及 driverCreateRequire 必填；通用正整数规则允许空/0 | E-001、E-005、E-007、E-008 |
+| FIELD-007 | `plate_number` | 关联车头/车挂拼接展示值 | 派生字符串，非预约表同名字段；模型无同名搜索器，控制器参数注释不代表实现了筛选 | E-002、E-004 |
+| FIELD-008 | `front_cargo` | 前装货名称 | 声明 varchar(255)，保存名称而非前装货档案ID | E-001、E-007、E-017 |
+| FIELD-009 | `cargo_category` | 货物类别代码 | 整数，页面/司机入口默认20；校验枚举值或空，展示分带编号和纯名称 | E-001、E-005～E-009 |
+| FIELD-010 | `cargo_category_desc` | 货类补充说明 | 声明 varchar(255)，服务允许写入，主要已分析页面无独立输入控件 | E-003、E-017 |
+| FIELD-011 | `tank_material` | 罐体材质 | 声明 varchar(100)，四个字符串选项，未见同等后端枚举校验 | E-001、E-005、E-007、E-017 |
+| FIELD-012 | `clean_type` | 多选清洗项目 | 以逗号连接字符串保存；手机 clean_type_list 为本地数组，提交前连接 | E-001、E-007、E-017 |
+| FIELD-013 | `tank_size` | 大小 | 非必填文本，声明 varchar(100)，代码未给统一单位 | E-001、E-007、E-017 |
+| FIELD-014 | `warehouse_position` | 电脑显示仓位，工人显示仓数 | 非必填文本，声明 varchar(100)，不能据文案推断为数值仓数 | E-001、E-010、E-017 |
+| FIELD-015 | `entry_time` | 入场/预约时间，收入日期也取此值 | Unix秒，两端创建必填；手机picker毫秒转秒、默认当前；服务缺键默认当前时间 | E-003、E-005、E-007 |
+| FIELD-016 | `task_start_time/task_end_time` | 作业起止时间 | 开始/完成写当前秒数；独立编辑缺键保留、空值为0，同时大于0时比较先后 | E-003 |
+| FIELD-017 | `destination` | 去向 | 非必填自由文本，声明 varchar(255) | E-001、E-007、E-017 |
+| FIELD-018 | `remark` | 预约备注 | 声明 varchar(255)，与收入备注分开；专用导出合并两种备注 | E-003、E-014、E-017 |
+| FIELD-019 | `state` | 作业流程状态 | 当前1/2/3/8/9；旧迁移的1=进行中已过时；服务通过缺省值设置1，未无条件覆盖直接调用的传入值 | E-003、E-006、E-017 |
+| FIELD-020 | `appoint_source` | 预约来源 | 迁移1=司机/2=电脑；司机明确写1，电脑创建未显式写2，实际来源区分待核对数据库默认及历史值 | E-001、E-003、E-008、E-017 |
+| FIELD-021 | `pay_method` | 约定支付方式，不代表已收款 | 页面默认4，当前选项2/3/4；后端还接受历史1，文案为“-” | E-001、E-005～E-007 |
+| FIELD-022 | `income_item_id/invoice_id/payment_id` | 收入、独立发票、现金日记账关联 | 整数ID；模型发票/付款关联过滤撤销记录，ID存在不等于关联对象有效或财务已核销 | E-003、E-004 |
+
+### 4.2 费用与发票字段
+
+| 字段 ID | 页面/请求字段 | 业务含义及来源 | 类型、默认与约束 | 证据 |
+| --- | --- | --- | --- | --- |
+| FIELD-023 | `income_item.custom_id` | 付费客户，收入表同名列 | 表单非必填，服务默认0；开票和收款要求有效客户 | E-001、E-003 |
+| FIELD-024 | `income_item.expense_name` | 费用名称 | 默认槽罐车清洗费用 | E-001、E-003、E-007 |
+| FIELD-025 | `income_item.currency` | 币种 | 1人民币/2美元，默认1；客户统计未分币种或换汇 | E-001、E-003 |
+| FIELD-026 | `income_item.need_invoice` | 开票需要 | 1需/2无需；非空费用对象须有合法值；服务缺失/null/空串会拒绝，存在的非2值归一为需票 | E-003、E-005、E-006 |
+| FIELD-027 | `income_item.quantity` | 计费数量 | 页面默认1、两位精度；服务将非正值归一为1 | E-001、E-003 |
+| FIELD-028 | `income_item.amount` | 实际含税金额 | 页面两位输入，司机初始提交0；服务经 taxCompute 处理，展示精度不代表数据库精度 | E-001、E-003、E-007、E-018 |
+| FIELD-029 | `income_item.unit_amount/other_amount` | 单价/附加费用 | 服务支持，当前主要表单未独立暴露；总额大于0且无单价时先以总额/数量反算四位单价 | E-001、E-003、E-018 |
+| FIELD-030 | `income_item.tax_rate` | 税率百分数 | 本模块默认6，页面选项0/1/3/6/9/13；不套用其他收入入口默认值 | E-001、E-003 |
+| FIELD-031 | `tax_amount/excluding_tax_amount/budget_*` | 税额、不含税及预算字段 | taxCompute计算，关键中间运算四位；预算金额随结果构建，UI两位不等于表结构精度 | E-003、E-018 |
+| FIELD-032 | `income_item.unit/remark` | 计费单位/财务备注 | 单位默认次；收入备注与预约备注独立 | E-001、E-003 |
+| FIELD-033 | `invoice_number/invoice_img/invoice_remark` | 关联发票号码、附件与备注 | 附件回显归一为 path/value/file_name；先通用上传再提交开票；当前页面未设置号码/附件必填 | E-001、E-002 |
+
+### 4.3 全部已纳入范围的 Map
+
+| 字段/映射 | 实际值与文案 | 默认、差异及未命中处理 | 证据 |
+| --- | --- | --- | --- |
+| `state` | 数值：1待确认；2待开始；3清洗中；8已撤销；9已完成 | 页面Map与当前枚举一致；IN_PROGRESS=1名称不能按字面解释为清洗中；枚举未知为未知，页面无通配兜底 | E-001、E-006 |
+| `cargo_category` | 数值：1爆炸；2气体；3易燃液体；4易燃固体；5氧化物；6有毒/氰化物；7放射性；8腐蚀性；9杂项；20普货 | 默认20；选择器/工人/专用导出为编号.名称，普货无编号；电脑和司机详情为名称；未知为未知 | E-001、E-006～E-010、E-014 |
+| `pay_method` | 数值：2扫码；3对公转账；4月结；历史1显示“-” | 默认4；后端cases接受1；常量WECHAT=1/ALIPAY=2/CASH=3/OTHER=4及旧迁移文案不等于当前业务含义 | E-005～E-007、E-017 |
+| `need_invoice` | 数值：1需开票；2无需开票 | 手机选项为字符串，提交转数字；枚举未知为未知；服务归一规则见FIELD-026 | E-003、E-006、E-007 |
+| `currency` | 数值：1人民币；2美元 | 表单默认1；本模块统计未统一币种 | E-001、E-003 |
+| `tank_material` | 字符串：不锈钢；铝合金；铁；衬塑 | 实际存字符串，不是数字编码 | E-001、E-007 |
+| `clean_type` | 字符串：蒸罐；洗罐；充氮0.5 | 可多选、逗号保存；证明0.5Bar来自模板/类型，非传感器测量 | E-001、E-007、E-013 |
+| `img_type` | 数值：1清洗前；2清洗后；3其他 | 两端上传表单默认2，接口校验合法值；后台未知显示“-” | E-001、E-010～E-012 |
+| `uploader_role` | 数值：1工人端；2电脑端 | 由对应控制器写入，非用户选择；未知显示“-” | E-011、E-012 |
+| `file_position` | 数值：1本地；2OSS | 依据上传配置写入；完整HTTP(S)地址直接返回，旧值缺失按当前存储模式回退 | E-012 |
+| `invoice_state_format` | 字符串键：未开票；部分开票；已开票；无需开票 | 页面通配键显示原值；控制器根据有效发票或全额状态生成，当前不直接输出部分开票 | E-001、E-002 |
+| `collection_state_format` | 字符串键：未收款；部分收款；已收款 | 页面通配键显示原值；控制器当前仅生成已收款/未收款，不直接输出部分收款 | E-001、E-002 |
+| `is_invoice_format/account_state_format/confirm_state_format` | 需/无需开票；已/未开账单；已/未确认 | 派生展示值，不是原始枚举；无收入时账单与确认状态显示“-” | E-002 |
+
+## 5. 页面按钮规则
+
+### 5.1 共同条件
+
+后台权限前缀 `yardExtraOpe.tankCleanOrder.`，读取/新建/编辑/确认/开始/完成/删除分别为 `read/add/edit/confirm/start/complete/del`。图片上传、删除除子级编辑权限外，还要能进入读取权限控制的父窗口。实际角色/岗位授权未核验，不能由菜单种子推断。[E-001、E-015]
+
+- **普通编辑锁**：收入已确认、已全额开票、已全额收款，任一成立即锁定。
+- **已有发票标志**：有效关联发票存在，或收入已全额开票。**已有收款标志**：有效关联日记账存在，或收入已全额收款。部分状态不保证标志为真。
+- **开票显示**：预约未撤销，且满足任一分支：① 有收入、有效客户、需开票、未全额开票；② 无需开票、已有收款、没有发票。第二分支不自动带入第一分支的全部条件，开票服务又拒绝无需开票，可能出现显示与执行差异。
+- **重传显示**：非撤销，有收入和有效客户，需开票、已全额开票且独立 `invoice_id>0`。
+- **收款显示**：非撤销，有收入和有效客户，无已有收款标志，金额大于0；实际执行还要求收入未收款。
+
+开票/重传/收款未叠加独立财务权限表达式，不表示任意用户可访问或通过鉴权。已读模块的 `invoice/collection` 方法也没有额外撤销状态校验，页面隐藏不等于后端已强制同一规则；通用财务服务的全部约束未完整展开。[E-002、E-003]
+
+所有动作仍受登录和数据范围前提约束。司机详情/取消显式校验本人及企业，工人列表显式注入企业，工人图片上传显式校验企业；工人详情/开始/完成的已读控制器未重复此校验，需结合基础服务查询范围理解，不能写成这些控制器均已显式检查企业。[E-008、E-009、E-011、E-018]
+
+### 5.2 后台预约与财务
+
+| 按钮 ID | 页面/区域/按钮名称 | 关联功能 ID | 按钮功能 | 可用条件 | 不可用时的表现或原因 | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| BTN-001 | 预约列表／刷新图标 | F-022 | 重新加载当前列表 | 页面可访问，无额外局部权限或状态表达式 | 失败是请求错误；自动加载不另算按钮 | E-001 |
+| BTN-002 | 预约列表／导出图标 | F-024 | 导出预约列表Excel | 页面可访问，未配置独立导出权限或勾选条数条件 | 导出链路未运行验证，不等于控件有禁用条件 | E-001、E-002 |
+| BTN-003 | 预约列表／新建预约 | F-002 | 打开新建表单 | 有新建权限 | 无权限隐藏，打开尚未创建数据 | E-001 |
+| BTN-035 | 新建预约弹窗／提交 | F-002 | 创建预约及关联收入 | 表单已打开；司机、车头、入场时间和费用校验通过 | 必填或格式失败不能正常提交，服务可拒绝 | E-001、E-003、E-005 |
+| BTN-004 | 预约列表批量操作／批量设置客户 | F-010 | 打开客户设置弹窗 | 编辑权限，通过批量组件选择预约 | 无权限隐藏，未选记录的控件表现依组件，未运行核验 | E-001 |
+| BTN-036 | 批量设置客户弹窗／确认提交 | F-010 | 批量修改收入客户 | 客户必填且ID大于0，全部所选预约通过后端校验 | 撤销/缺收入/收入已确认则服务拒绝，事务回滚 | E-001、E-003 |
+| BTN-005 | 预约列表行／详情 | F-023 | 打开详情抽屉 | 读取权限、有效预约 | 无权限隐藏，数据获取受后端范围约束 | E-001、E-002 |
+| BTN-006 | 详情抽屉／操作日志页签 | F-028 | 请求日志列表 | 继承详情读取入口前提 | 页签存在，接口固定空数组，不是禁用 | E-001、E-002 |
+| BTN-013 | 预约列表行／编辑 | F-013 | 打开编辑表单 | 编辑权限、非撤销、未触发普通编辑锁 | 不满足隐藏，已完成本身不阻止编辑 | E-001、E-002 |
+| BTN-038 | 编辑预约弹窗／确认提交 | F-013 | 保存预约和收入 | 输入通过校验，提交时仍满足服务财务锁规则 | 打开后状态变化也可被后端拒绝 | E-001、E-003、E-005 |
+| BTN-014 | 预约列表行／确认 | F-003 | 二次确认后转待开始 | 确认权限、状态1 | 其他状态或无权限隐藏，后端再次校验 | E-001、E-003 |
+| BTN-015 | 预约列表行／开始任务 | F-004 | 二次确认后开始并记时间 | 开始权限、状态2 | 其他状态或无权限隐藏，服务检查原状态 | E-001、E-003 |
+| BTN-016 | 预约列表行／完成 | F-005 | 二次确认后完成并记时间 | 完成权限、状态3 | 其他状态或无权限隐藏，服务拒绝跳过开始 | E-001、E-003 |
+| BTN-017 | 预约列表行／编辑时间 | F-006 | 打开时间与支付方式表单 | 编辑权限、状态9，不叠加普通编辑财务锁 | 其他状态或无权限隐藏 | E-001 |
+| BTN-039 | 编辑时间弹窗／确认提交 | F-006 | 保存起止时间和支付方式 | 支付方式必填；非撤销；均非零时结束不早于开始 | 表单/服务校验拒绝；服务未强制状态9 | E-001、E-003 |
+| BTN-018 | 预约列表行／开票或重传发票 | F-007、F-014 | 按财务状态打开对应抽屉 | 满足5.1开票或重传显示条件；重传条件为真时优先用重传文案 | 不满足隐藏；无需开票例外分支可显示却被服务拒绝 | E-001～E-003 |
+| BTN-019 | 发票抽屉／开票附件上传控件 | F-007、F-014 | 先通用上传，准备附件路径 | 已打开抽屉并选文件，控件未设置必填 | 上传文件不等于已登记发票，通用上传完整限制未展开 | E-001 |
+| BTN-040 | 发票抽屉／确认提交 | F-007、F-014 | 首次登记发票或更新独立发票 | 收入/客户有效且需开票；重传有独立发票，首次不能已有账单 | 服务不满足则拒绝；号码/附件未设页面必填 | E-001～E-003 |
+| BTN-020 | 预约列表行／收款 | F-008 | 二次确认后登记日记账并按条件核销 | 满足5.1收款显示条件；服务要求收入未收款且金额大于0 | 不满足隐藏；部分收款、缺独立发票或已有账单等可被拒绝 | E-001～E-003 |
+| BTN-021 | 预约列表行／删除 | F-015 | 二次确认后软删预约和收入 | 删除权限，无已有发票/收款标志，页面未限制作业状态 | 不满足隐藏；服务另拒绝部分财务状态和残留关联ID | E-001～E-003 |
+
+### 5.3 图片与证明
+
+| 按钮 ID | 页面/区域/按钮名称 | 关联功能 ID | 按钮功能 | 可用条件 | 不可用时的表现或原因 | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| BTN-007 | 预约列表行／图片 | F-011 | 打开图片管理窗口 | 读取权限，无作业状态限制 | 无权限隐藏 | E-001 |
+| BTN-008 | 图片窗口／上传图片 | F-016 | 打开类型、文件、备注表单 | 父入口读取权限加编辑权限，无作业状态限制 | 无编辑权限隐藏；子权限不能替代父入口权限 | E-001 |
+| BTN-052 | 图片上传表单／文件控件“上传图片” | F-016 | 选择待提交图片文件 | 已打开上传表单，支持多选或拖入指定图片类型 | 当前以Blob交给表单提交，选文件尚不等于创建图片记录 | E-001 |
+| BTN-037 | 图片上传弹窗／确认提交 | F-016 | 上传并创建图片关联 | 继承读取及编辑前提，图片类型和文件必填，预约/数据范围有效 | 表单或后端拒绝；后台没有工人端相同的3/9限制 | E-001、E-012 |
+| BTN-009 | 图片卡片／删除 | F-017 | 二次确认后软删当前图片 | 读取加编辑权限，图片ID和预约关联匹配 | 无编辑权限隐藏，关联不符服务拒绝；不是删除预约 | E-001、E-012 |
+| BTN-010 | 图片卡片／点击图片 | F-018 | 打开大图弹窗 | 图片已加载，继承父入口读取前提 | 无图片无点击对象，坏地址影响显示而非业务禁用 | E-001 |
+| BTN-011 | 预约列表行／充氮证明 | F-019 | 生成下载SVG证明 | 读取权限、有效预约，无完成/充氮项目显示限制 | 无权限隐藏；模板文字不表示实测 | E-001、E-013 |
+| BTN-012 | 预约列表行／清洗证明 | F-020 | 生成下载SVG证明 | 读取权限、有效预约，未配置状态限制 | 无权限隐藏；后端也未统一要求已完成 | E-001、E-013 |
+
+### 5.4 司机端与工人端
+
+| 按钮 ID | 页面/区域/按钮名称 | 关联功能 ID | 按钮功能 | 可用条件 | 不可用时的表现或原因 | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| BTN-043 | 司机列表／预约槽罐车清洗 | F-001 | 进入预约表单 | 可访问已登录司机端，无额外记录状态条件 | 身份前提由登录及接口链路处理 | E-007、E-008 |
+| BTN-024 | 司机表单／提交预约 | F-001 | 创建预约，成功后清草稿并返回 | 已选车头、车挂，已勾真实性承诺；后端必填/格式通过 | 缺车牌或承诺会提示；500毫秒防抖，未发现独立请求中禁用锁 | E-005、E-007、E-008 |
+| BTN-025 | 司机表单／暂存 | F-025 | 保存本机草稿并提示 | 表单可访问，不要求通过正式预约必填检查 | 不是后端保存，缓存未按身份隔离 | E-007 |
+| BTN-026 | 司机列表／点击记录卡片 | F-023 | 获取本人预约详情并打开弹窗 | 有记录，接口校验本人及企业 | 不属于本人或企业由接口拒绝 | E-008 |
+| BTN-027 | 司机详情／取消预约 | F-009 | 打开取消确认框 | 详情状态1 | 其他状态不显示；打开弹框未执行撤销 | E-008 |
+| BTN-044 | 司机取消确认框／确认 | F-009 | 执行撤销并刷新列表 | 归属有效，服务排除8/9及收入已确认 | 提交时状态/财务变化可被拒绝 | E-003、E-008 |
+| BTN-028 | 司机详情／发票附件“点击下载” | F-026 | 打开或下载附件 | 有附件集合、当前地址非空 | 无附件不显示；空地址或下载失败有提示 | E-008 |
+| BTN-029 | 工人列表／详情 | F-023 | 进入详情页 | 有可选记录，受登录及基础查询数据范围约束 | 未核验实际岗位授权，不把登录当作岗位证明 | E-009、E-010、E-018 |
+| BTN-030 | 工人列表／开始任务 | F-004 | 二次确认后开始任务 | 记录状态2 | 其他状态隐藏，服务再检查原状态 | E-009 |
+| BTN-031 | 工人列表／完成 | F-005 | 二次确认后完成任务 | 记录状态3 | 其他状态隐藏，服务再检查原状态 | E-009 |
+| BTN-041 | 工人详情／开始任务 | F-004 | 二次确认后开始并刷新 | 详情状态2；父操作区要求2/3 | 其他状态隐藏 | E-010 |
+| BTN-042 | 工人详情／完成 | F-005 | 二次确认后完成并刷新 | 详情状态3；父操作区要求2/3 | 其他状态隐藏，不能从待开始直接完成 | E-010 |
+| BTN-032 | 工人详情／选择并上传图片 | F-016 | 最多选择9张，逐张上传 | 界面无状态隐藏；上传中显示loading且方法阻止重复选择；后端要求3/9及企业匹配 | 待开始仍显示但后端拒绝；回调未检查HTTP/业务码，可能误报成功 | E-010、E-011 |
+| BTN-033 | 工人详情／点击已有图片 | F-018 | 系统图片预览 | 图片集合非空 | 无图片无点击对象 | E-010 |
+
+### 5.5 报表及档案快捷入口
+
+| 按钮 ID | 页面/区域/按钮名称 | 关联功能 ID | 按钮功能 | 可用条件 | 不可用时的表现或原因 | 证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| BTN-022 | 统计报表页签／查询 | F-012 | 提交筛选到统计卡片和客户表 | 页签可访问，条件可为空，无局部权限表达式 | 不强制只统计已完成，查询错误不等于禁用 | E-001、E-003 |
+| BTN-051 | 客户统计表／刷新图标 | F-012 | 重新加载客户统计表 | 页签可访问，无局部权限或状态限制 | 只刷新表格组件，不能推断同步刷新顶部卡片 | E-001 |
+| BTN-023 | 客户统计行／客户详情 | F-027 | 打开该客户的预约明细 | 客户ID大于0 | 未设置客户等ID非正行不显示 | E-001 |
+| BTN-034 | 专项账单批量操作／槽罐车导出 | F-021 | 调用账单导出，来源12生成槽车记录表 | 有 yardIncome.generalAccount.export 或 yardIncome.account.export 权限；固定来源为空或12，需选有效账单 | 其他固定来源不构造，无权限隐藏；多选混来源会拒绝，单选其他来源可走其他导出格式 | E-014 |
+| BTN-045 | 预约表单／新增司机 | F-029 | 打开快捷司机新增表单 | 可打开新建/编辑预约表单，未叠加司机局部权限表达式 | 不代表司机后端任意用户可写 | E-001 |
+| BTN-046 | 新增司机表单／确认提交 | F-029 | 创建并回填司机、手机号，清空车牌 | 手机号必填且符合正则，外部接口校验通过 | 输入格式前端提示；外部模块完整权限/约束未展开 | E-001 |
+| BTN-047 | 预约表单／新增车头 | F-030 | 打开快捷车头新增表单 | 可打开预约表单，无额外“已选司机”禁用表达式 | 不能把请求有司机参数推断为页面已禁用无司机场景 | E-001 |
+| BTN-048 | 新增车头表单／确认提交 | F-030 | 创建类型1车牌供选择 | 车牌必填并符合车头正则，携带司机，外部接口校验通过 | 前端格式校验或外部服务拒绝 | E-001 |
+| BTN-049 | 预约表单／新增车挂 | F-031 | 打开快捷车挂新增表单 | 可打开预约表单，无额外局部权限/司机禁用表达式 | 外部档案入口不等于完整权限已核验 | E-001 |
+| BTN-050 | 新增车挂表单／确认提交 | F-031 | 创建类型2车牌供选择 | 车牌必填并符合车挂正则，携带司机，外部接口校验通过 | 车挂正则与车头不同，完整后端约束未展开 | E-001 |
+
+“确认提交”表示表单提交行为：新建弹窗明确文案为“提交”，其他未自定义动作由AMIS组件生成，实际显示文案未运行核验。二次确认提示作为当前动作的确认步骤；打开业务表单与提交分别列举。[E-001]
+
+列显示切换、分页和弹层关闭/取消只改变本地展示，不另建业务功能。图片ZIP批量下载按钮已注释；后台cancel方法未注册路由；日志虽有页签但固定空数据，不能根据方法或字典存在推断已开放功能。[E-001、E-002、E-016]
+
+## 6. 相关统计报表
+
+未核验部署域名，链接均为真实代码入口，按所属页面进入，不以API或下载地址冒充报表页面。客户明细为统计下钻，预约通用导出是普通业务列表导出，均不另算独立统计报表。[E-001、E-014]
+
+| 报表名称 | 报表链接 | 简述 |
+| --- | --- | --- |
+| 客户统计报表 | [代码入口：槽罐车清洗 → 统计报表页签](/www/yard/web/public/backend/pages/yard/extraOpe/tankCleanOrder.js:1078) | 按客户查看作业量、金额、开票及收入核销收款，可下钻明细。未默认只看已完成、未分币种/换汇，未核销日记账不等于报表收款。 |
+| 槽车记录表（专用明细报表） | [代码入口：专项账单 → 槽罐车导出](/www/yard/web/public/backend/pages/yard/finance/generalIncomeAccount.js:542) | 选中槽罐车账单生成车辆与清洗费用的12列Excel，属于专用明细报表文件。不是在线汇总统计页。 |
+
+专用Excel列为：时间、车牌号码、前装货、类别、罐装材质、清洗类型、入场时间、清洗时间、驾驶员、电话、总计、备注。汇总只按客户，不按币种；作业量是预约条数，收款取收入已核销金额，日记账登记成功不能直接当作已核销。[E-003、E-014]
+
+## 7. 需求到修改范围
+
+| 需求 | 优先检查 | 关联影响 |
+| --- | --- | --- |
+| 字段、默认、必填 | 两端表单、三类控制器、验证器、service白名单及upsertIncomeItem | 司机/电脑差异、费用嵌套回显、实际DDL与迁移、通用收入钩子 |
+| 状态与按钮权限 | AMIS visibleOn、fillFinanceState、服务状态检查、路由、PowerService | 工人列表/详情重复入口、父容器、直接接口、撤销及部分财务状态 |
+| 支付/货类/清洗选项 | 枚举、电脑与手机选项、校验 | 历史值、工人编号展示、报表、导出与证明 |
+| 财务 | invoice/collection/_createAccount/_createInvoice/_createPayment/autoWriteOff | 通用收入/账单/发票/日记账、先收后票、独立发票、重复与并发 |
+| 图片 | 两端页面、图片控制器、图片服务及模型 | 企业/状态、业务错误、部分上传、本地/OSS、软删除与物理文件边界 |
+| 统计与导出 | customStatistic、统计页签、IncomeAccountService::export/exportTankCleanAccounts | 币种、核销、无客户、筛选透传、来源、单选其他类型与12列格式 |
+| 日志 | 后台log、页面source、现有日志字典与通用查询 | 固定空返回尚未接通，需真实记录和范围校验 |
+| 缓存 | 司机saveDraft/loadDraft/persistLastPlate | 草稿与最近车牌未按身份区分，同设备换账号 |
+
+## 8. 候选建议与需求状态
+
+所有条目是静态分析发现或条件性建议，尚未授权实施。
+
+| 建议 ID | 问题与触发条件 | 建议及验证方向 | 优先级理由 | 证据 |
+| --- | --- | --- | --- | --- |
+| OPT-001 | 已确认实现缺口：日志页签接口固定返回空数组 | 接入真实日志前明确业务要求，核对创建/修改后的日志及企业范围 | 中：影响追溯 | E-001、E-002 |
+| OPT-002 | 一致性：支付历史值1可通过校验但显示“-”，常量名与当前文案不同 | 确认历史兼容策略后统一校验、展示与注释，覆盖1/2/3/4 | 中：影响支付方式理解 | E-005～E-007、E-017 |
+| OPT-003 | 交互差异：工人待开始仍能选上传，后端只接受3/9 | 补状态提示或入口条件，覆盖2/3/9及失败重试 | 中：减少无效操作 | E-010、E-011 |
+| OPT-004 | 反馈缺口：手机上传success回调未检查HTTP与业务成功码 | 逐张解析响应并处理部分失败，失败不能显示整批成功 | 高：可能误导上传结果 | E-010 |
+| OPT-005 | 条件差异：时间编辑、取消、开票标志、删除的前后端规则不完全一致 | 按实际业务确认哪些规则需后端强制，覆盖直接调用、部分财务状态及撤销 | 高：涉及流程和财务数据 | E-001～E-003、E-008 |
+| OPT-006 | 报表限制：跨币种直接累加，先收未核销不计收入收款 | 标明币种/核销范围，按业务选择分币种或换算，覆盖先收后票 | 中：影响财务解释 | E-003 |
+| OPT-007 | 缓存未隔离：草稿与最近车牌键不含司机/企业 | 按身份分隔或切换时清理，覆盖同设备换账号 | 中：避免串用资料 | E-007 |
+| OPT-008 | 来源记录：电脑创建未显式写 appoint_source=2 | 先核对实际默认和历史值，再决定由入口写可信来源 | 中：影响来源统计 | E-001、E-003、E-008、E-017 |
+| OPT-009 | 导出边界：槽罐车按钮未按所选记录类型限制，单选其他来源可能导出其他格式 | 确认是否应限定选中来源12；核对单选非12、多选混来源和有效槽罐车账单 | 中：按钮文案与输出可能不符 | E-014 |
+
+## 9. 后续开发验证方向
+
+当前未发现明确的槽罐车专用自动化测试入口；不盲目运行可能写库的旧脚本。以下是后续获授权开发时的用例方向，不是本轮已通过的运行结果。
+
+| 影响范围 | 建议核对 |
+| --- | --- |
+| 正常流程 | 两端创建→后台确认→开始→完成，核对状态、时间与收入关联 |
+| 字段/枚举 | 两端车挂差异、支付1/2/3/4、未知货类、空/缺时间、时间倒置 |
+| 权限/数据范围 | 父入口权限、实际登录类型、跨司机/企业、撤销、部分及全额财务状态 |
+| 图片 | 2拒绝、3/9上传；HTTP/业务失败、重复点击、部分成功、重试 |
+| 财务 | 无客户/零额、需票先收后票、无需票、已有账单、独立发票缺失、重复和并发 |
+| 报表/文件 | 混币、无客户、未核销收款、混来源、多选/单选其他来源、12列、未完成证明 |
+| 日志/缓存 | 日志真实返回、同设备换司机的草稿与最近车牌 |
+
+## 10. 人工决策与双文档同步约定
+
+后续 AI 只将本文件作为模块文档输入，读取当前用户需求及项目 AGENTS.md，并按需核对源码。另一份开发者说明仅作为写入目标，不依靠读取它补充字段、功能、证据或人工背景。本文内各类ID均有本地定义；源代码证据见第2节，业务事实见第3～6节。
+
+获授权的功能修改完成后：先更新本文的现状、代码入口、规则、影响及需求状态，再依据本文与实际代码同步更新开发者说明，保持模块ID、分析批次和真实基线一致。局部复核不能将未复核范围标为全量完成；候选建议、讨论和文档维护都不额外授权业务代码开发或数据库写入。
+
+用户已确认：以槽罐车作为真实样例；开发者版使用字母流程图、数字后缀分支、图表对应、操作端、字段Map、按钮功能与可用条件、三列报表；不单列角色/页面操作矩阵，不附本轮验证报告或维护流水。人工保留事实和不采纳理由应记录于本文，避免仅存在于开发者说明。
+
+当前没有已批准的业务代码优化清单或下一版本开发计划，所有OPT候选建议均未实施；正式样例验收标准仍待用户反馈。通用财务、外部档案和上传边界见第1、3～5节，实际授权/DDL/运行行为仍未核验。
