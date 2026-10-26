@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 module_id: yard-tank-clean
-analysis_id: yard-tank-clean-20261026-r3
+analysis_id: yard-tank-clean-20261026-r4
 document_type: ai-context
 status: sample-feedback-pending
 source_root: /www/yard/web
@@ -25,7 +25,7 @@ coverage: partial
 
 已分析：后台槽罐车预约与统计页签、司机预约表单/列表详情、工人作业列表/详情、图片与证明、快捷财务，以及专项账单中的槽罐车专用导出。后台入口为 `yard/extraOpe/tankCleanOrder` 的 AMIS 配置，移动端为 Uni-App。[E-001～E-016]
 
-通用财务、司机/车牌及通用上传只覆盖调用边界，未完整展开；部署地址、实际角色/岗位、目标库DDL和客户端效果未核验。当前源码工作区干净，与既有AI文档记录的提交一致。本次依据当前skill原位重新生成，重点复核页面配置/模板、按钮区域与操作顺序、各端进入路径及既有关键规则，并按最新skill补齐各功能的业务描述/操作入口和7.1.2的页面顺序/触发结果；其余条目沿用同一代码基线的既有静态分析，不升级为全量运行验证。没有调用业务接口、查询数据库或执行迁移。
+通用财务、司机/车牌及通用上传只覆盖调用边界，未完整展开；部署地址、实际角色/岗位、目标库DDL和客户端效果未核验。当前源码工作区干净，与既有AI文档记录的提交一致。本次依据当前skill原位重新生成，重点复核字段请求/响应、费用回填对象及司机费用白名单，并按最新skill合并人版字段表、精简Map和按钮表，将完整映射集中到证据索引；其余条目沿用同一代码基线的既有静态分析，不升级为全量运行验证。没有调用业务接口、查询数据库或执行迁移。
 
 输出位置：
 
@@ -68,7 +68,7 @@ developer_output: /www/ai/skill-previews/code-module-feature-map/yard-tank-clean
 
 已知问题和条件性建议在第7.8节OPT表独立定义；优先留意上传错误反馈OPT-004、前后端边界OPT-005，以及导出文案/单选来源差异OPT-009。现状与建议目标分开，既有缺陷不默认成为正确业务验收标准。
 
-用户已确认两份文档分工：本文独立支撑AI新需求方案和获授权的代码修改，前置摘要/需求索引、后置完整事实；人版供开发测试，第2节业务流程使用“功能名称、操作端、功能描述、操作链接、处理结果”五列，第3节“页面与功能描述”按页面依次使用“按钮名称、关键规则、触发结果”三列；保留字母分支、字段/Map、按钮可用条件及三列报表，完整功能/图节点/页面按钮/证据映射集中在第9节。不单列角色/页面操作矩阵，不输出集中验证报告或维护流水。
+用户已确认两份文档分工：本文独立支撑AI新需求方案和获授权的代码修改，前置摘要/需求索引、后置完整事实；人版供开发测试，第2节业务流程使用“功能名称、操作端、功能描述、操作链接、处理结果”五列，第3节“页面与功能描述”按页面依次使用“按钮名称、关键规则、触发结果”三列；第4节字段合并为“字段名、请求/响应、字段含义、类型/单位/精度、前端默认/校验、后端默认/校验、补充说明”七列，不显示字段ID与证据；第5节不显示证据，第6节不显示按钮ID与证据、保留关联功能ID。保留字母分支及三列报表，完整功能/图节点/字段/Map/页面按钮/证据映射集中在第9节，本文保留完整ID与证据。不单列角色/页面操作矩阵，不输出集中验证报告或维护流水。
 
 当前任务只有重新生成文档，没有已批准的业务代码优化清单，全部OPT建议未实施。文档可用性按当前skill场景标准检查，真实页面、接口、业务验收仍未执行。重要人工约定和不采纳理由应保存在本文，不能仅写入人版。
 
@@ -88,7 +88,7 @@ developer_output: /www/ai/skill-previews/code-module-feature-map/yard-tank-clean
 
 ### 6.1 实现后的同步
 
-功能修改后先更新本文前部摘要、需求索引、关键约束和后部事实/证据，再依据当前实现同步开发者说明；开发者文档仅为写入目标，不回读以补缺失定义。保持模块ID、实际基线、批次和覆盖范围一致，保留稳定ID与人工决策，人版第2节使用五列业务流程表，第3节按页面生成三列功能表，完整ID/节点/页面按钮映射放第9节；本文保留其独立事实，不依赖旧人版还原页面。局部复核不升级为全量已验证。讨论中的方案不改写现状，未实施建议仍是候选；同步在当次任务中完成，不创建监听或定时任务。
+功能修改后先更新本文前部摘要、需求索引、关键约束和后部事实/证据，再依据当前实现同步开发者说明；开发者文档仅为写入目标，不回读以补缺失定义。保持模块ID、实际基线、批次和覆盖范围一致，保留稳定ID与人工决策，人版第2节使用五列业务流程表，第3节按页面生成三列功能表，第4节合并七列表，第5节不显示证据，第6节不显示按钮ID和证据；完整ID/节点/字段/Map/页面按钮映射放第9节；本文保留其独立事实，不依赖旧人版还原页面。局部复核不升级为全量已验证。讨论中的方案不改写现状，未实施建议仍是候选；同步在当次任务中完成，不创建监听或定时任务。
 
 ## 7. 完整事实附表与代码证据
 
@@ -476,45 +476,45 @@ flowchart LR
 
 预约模型为 `103_tank_clean_order`，图片为 `103_tank_clean_order_image`。类型/长度依据模型、代码及声明迁移，未核验线上DDL；通用审计字段不当作页面业务输入。[E-004、E-012、E-017]
 
-字段说明与约束表通过同一FIELD编号关联，不是重复定义新字段。`income_item` 为费用嵌套表单，`incomeItem` 为关联；手机真实性承诺和多选数组是本地状态，承诺不随请求落库，多选转字符串提交。[E-001、E-002、E-007]
+字段说明与约束表通过同一FIELD编号关联，不是重复定义新字段；人版第4节按该编号将两表合并为七列，不显示字段ID与证据。请求/响应说明的是相关入口的合同，不代表所有接口都接受或返回全部字段。`income_item` 为费用嵌套表单，`incomeItem` 为关联；手机真实性承诺和多选数组是本地状态，承诺不随请求落库，多选转字符串提交。[E-001、E-002、E-007]
 
 #### 字段含义与来源
 
 | 字段 ID | 页面标签/绑定 | 请求/响应键 | 业务含义与存储/派生来源 | 证据 |
 | --- | --- | --- | --- | --- |
-| FIELD-001 | 预约标识 | `id` | 预约标识，不同于图片ID或收入ID | E-002、E-004 |
-| FIELD-002 | 业务单号 | `order_no` | 业务单号 | E-003、E-017 |
-| FIELD-003 | 司机 | `driver_id` | 司机档案关联 | E-005、E-008 |
-| FIELD-004 | 司机姓名/手机号/车队 | `driver_name/driver_mobile/driver_fleet`；展示 `driver.name/mobile/fleet` | 由 driver.name/mobile/fleet 关联展示，不是预约同名快照 | E-001、E-003、E-005、E-007、E-008 |
-| FIELD-005 | 车头 | `head_plate_id` | 车头档案ID | E-001、E-005、E-008 |
-| FIELD-006 | 车挂 | `trailer_plate_id` | 车挂档案ID | E-001、E-005、E-007、E-008 |
-| FIELD-007 | 车牌号码 | `plate_number` | 关联车头/车挂拼接展示值 | E-002、E-004 |
-| FIELD-008 | 前装货 | `front_cargo` | 前装货名称 | E-001、E-007、E-017 |
-| FIELD-009 | 类别 | `cargo_category` | 货物类别代码 | E-001、E-005～E-009 |
-| FIELD-010 | 类别补充说明 | `cargo_category_desc` | 货类补充说明 | E-003、E-017 |
-| FIELD-011 | 罐装材质 | `tank_material` | 罐体材质 | E-001、E-005、E-007、E-017 |
-| FIELD-012 | 清洗类型 | `clean_type` | 多选清洗项目 | E-001、E-007、E-017 |
-| FIELD-013 | 大小 | `tank_size` | 大小 | E-001、E-007、E-017 |
-| FIELD-014 | 仓位（工人端仓数） | `warehouse_position` | 电脑显示仓位，工人显示仓数 | E-001、E-010、E-017 |
-| FIELD-015 | 入场时间 | `entry_time` | 入场/预约时间，收入日期也取此值 | E-003、E-005、E-007 |
-| FIELD-016 | 开始/完成时间 | `task_start_time/task_end_time` | 作业起止时间 | E-003 |
-| FIELD-017 | 去向 | `destination` | 去向 | E-001、E-007、E-017 |
-| FIELD-018 | 其他（预约备注） | `remark` | 预约备注 | E-003、E-014、E-017 |
-| FIELD-019 | 流程状态 | `state` | 作业流程状态 | E-003、E-006、E-017 |
-| FIELD-020 | 预约来源 | `appoint_source` | 预约来源 | E-001、E-003、E-008、E-017 |
-| FIELD-021 | 支付方式 | `pay_method` | 约定支付方式，不代表已收款 | E-001、E-005～E-007 |
-| FIELD-022 | 收入/发票/收款关联 | `income_item_id/invoice_id/payment_id` | 收入、独立发票、现金日记账关联 | E-003、E-004 |
-| FIELD-023 | 客户 | `income_item.custom_id` | 付费客户，收入表同名列 | E-001、E-003 |
-| FIELD-024 | 费用名 | `income_item.expense_name` | 费用名称 | E-001、E-003、E-007 |
-| FIELD-025 | 币种 | `income_item.currency` | 币种 | E-001、E-003 |
-| FIELD-026 | 开票 | `income_item.need_invoice` | 开票需要 | E-003、E-005、E-006 |
-| FIELD-027 | 数量 | `income_item.quantity` | 计费数量 | E-001、E-003 |
-| FIELD-028 | 总金额 | `income_item.amount` | 实际含税金额 | E-001、E-003、E-007、E-018 |
-| FIELD-029 | 单价/附加费用 | `income_item.unit_amount/other_amount` | 单价/附加费用 | E-001、E-003、E-018 |
-| FIELD-030 | 税率 | `income_item.tax_rate` | 税率百分数 | E-001、E-003 |
-| FIELD-031 | 税额/不含税/预算字段 | `tax_amount/excluding_tax_amount/budget_*` | 税额、不含税及预算字段 | E-003、E-018 |
-| FIELD-032 | 单位/财务备注 | `income_item.unit/remark` | 计费单位/财务备注 | E-001、E-003 |
-| FIELD-033 | 发票号码/附件/备注 | `invoice_number/invoice_img`；响应 `invoice_remark`，提交 `remark` | 关联发票号码、附件与备注 | E-001、E-002 |
+| FIELD-001 | 预约标识 | 请求：各详情/修改/业务动作的 `id`；响应：预约 `id` | 预约标识，不同于图片ID或收入ID；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-002、E-004 |
+| FIELD-002 | 业务单号 | 请求：查询 `order_no`；响应：`order_no`，正常表单不手填单号 | 业务单号；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-003、E-017 |
+| FIELD-003 | 司机 | 请求：电脑 `driver_id`，司机创建由身份注入；响应：`driver_id` | 司机档案关联；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-005、E-008 |
+| FIELD-004 | 司机姓名/手机号/车队 | 请求：`driver_name/driver_mobile/driver_fleet`；响应：`driver_name/driver_mobile/fleet` 及 `driver.name/mobile/fleet` | 由 driver.name/mobile/fleet 关联展示，不是预约同名快照；来源：司机关联 `driver.name/mobile/fleet`，列表/详情另生成别名；司机入口可同步档案资料 | E-001、E-003、E-005、E-007、E-008 |
+| FIELD-005 | 车头 | 请求/响应：`head_plate_id` | 车头档案ID；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-005、E-008 |
+| FIELD-006 | 车挂 | 请求/响应：`trailer_plate_id` | 车挂档案ID；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-005、E-007、E-008 |
+| FIELD-007 | 车牌号码 | 请求：无同名页面写入字段；响应：派生 `plate_number` | 关联车头/车挂拼接展示值；来源：车头/车挂关联牌号由控制器拼接，不是同名预约表列 | E-002、E-004 |
+| FIELD-008 | 前装货 | 请求/响应：`front_cargo` | 前装货名称；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-007、E-017 |
+| FIELD-009 | 类别 | 请求：`cargo_category`；响应：原值及 `cargo_category_format` | 货物类别代码；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-005～E-009 |
+| FIELD-010 | 类别补充说明 | 请求/响应：`cargo_category_desc` | 货类补充说明；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-003、E-017 |
+| FIELD-011 | 罐装材质 | 请求/响应：`tank_material` | 罐体材质；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-005、E-007、E-017 |
+| FIELD-012 | 清洗类型 | 请求：`clean_type` 逗号字符串；响应：`clean_type`；手机 `clean_type_list` 仅本地数组 | 多选清洗项目；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-007、E-017 |
+| FIELD-013 | 大小 | 请求/响应：`tank_size` | 大小；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-007、E-017 |
+| FIELD-014 | 仓位（工人端仓数） | 请求/响应：`warehouse_position` | 电脑显示仓位，工人显示仓数；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-010、E-017 |
+| FIELD-015 | 入场时间 | 请求：`entry_time` 秒值或查询范围；响应：`entry_time` 及 `entry_time_format` | 入场/预约时间，收入日期也取此值；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-003、E-005、E-007 |
+| FIELD-016 | 开始/完成时间 | 请求：独立编辑的 `task_start_time/task_end_time`；响应：原值及各自 `_format`，开始/完成动作自动写时间 | 作业起止时间；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-003 |
+| FIELD-017 | 去向 | 请求/响应：`destination` | 去向；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-007、E-017 |
+| FIELD-018 | 其他（预约备注） | 请求/响应：`remark` | 预约备注；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-003、E-014、E-017 |
+| FIELD-019 | 流程状态 | 请求：查询 `state`，正常作业由动作驱动；响应：`state/state_format` | 作业流程状态；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-003、E-006、E-017 |
+| FIELD-020 | 预约来源 | 请求：司机入口写 `appoint_source=1`，主表单无手填；响应：记录 `appoint_source` | 预约来源；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-003、E-008、E-017 |
+| FIELD-021 | 支付方式 | 请求：`pay_method`；响应：`pay_method/pay_method_format` | 约定支付方式，不代表已收款；来源：预约模型 `103_tank_clean_order` 的对应存储字段 | E-001、E-005～E-007 |
+| FIELD-022 | 收入/发票/收款关联 | 请求：主表单不手填系统关联；响应：`income_item_id/invoice_id/payment_id` 及相应关联对象 | 收入、独立发票、现金日记账关联；来源：预约表保存关联ID，收入/发票/日记账内容来自有效关联对象 | E-003、E-004 |
+| FIELD-023 | 客户 | 请求：费用 `income_item.custom_id`，筛选/批量 `custom_id`；响应：详情费用对象、关联收入及 `income_custom_id/income_custom_name` | 付费客户，收入表同名列；来源：关联收入表字段，后台详情另构造 `income_item` 回填对象 | E-001、E-003 |
+| FIELD-024 | 费用名 | 请求：`income_item.expense_name`；响应：详情 `income_item.expense_name` 及关联收入 | 费用名称；来源：关联收入表字段，后台详情另构造 `income_item` 回填对象 | E-001、E-003、E-007 |
+| FIELD-025 | 币种 | 请求：`income_item.currency`；响应：详情 `income_item.currency` 及关联收入 | 币种；来源：关联收入表字段，后台详情另构造 `income_item` 回填对象 | E-001、E-003 |
+| FIELD-026 | 开票 | 请求：`income_item.need_invoice`；响应：详情 `income_item.need_invoice` 及关联收入 | 开票需要；来源：关联收入表字段，后台详情另构造 `income_item` 回填对象 | E-003、E-005、E-006 |
+| FIELD-027 | 数量 | 请求：电脑 `income_item.quantity`，司机费用白名单不透传数量；响应：详情费用数量及关联收入 | 计费数量；来源：关联收入表字段，后台详情另构造 `income_item` 回填对象 | E-001、E-003 |
+| FIELD-028 | 总金额 | 请求：`income_item.amount`；响应：详情费用金额、关联收入及派生 `amount` | 实际含税金额；来源：关联收入表字段，后台详情另构造 `income_item` 回填对象 | E-001、E-003、E-007、E-018 |
+| FIELD-029 | 单价/附加费用 | 请求：服务支持 `income_item.unit_amount/other_amount`，主表单无独立输入、司机白名单不透传；响应：关联收入同名字段 | 单价/附加费用；来源：关联收入 `unit_amount/other_amount`；当前详情的 `income_item` 回填对象不包含这两项 | E-001、E-003、E-018 |
+| FIELD-030 | 税率 | 请求：电脑 `income_item.tax_rate`，司机费用白名单不透传税率；响应：详情费用税率及关联收入 | 税率百分数；来源：关联收入表字段，后台详情另构造 `income_item` 回填对象 | E-001、E-003 |
+| FIELD-031 | 税额/不含税/预算字段 | 请求：无独立页面输入，服务计算；响应：关联收入 `tax_amount/excluding_tax_amount/budget_*` | 税额、不含税及预算字段；来源：关联收入字段由 `FinanceTool::taxCompute` 及预算构造生成 | E-003、E-018 |
+| FIELD-032 | 单位/财务备注 | 请求：`income_item.unit`、`income_item.remark`，司机费用白名单不透传财务备注；响应：详情费用单位/备注及关联收入 | 计费单位/财务备注；来源：关联收入表字段，后台详情另构造 `income_item` 回填对象 | E-001、E-003 |
+| FIELD-033 | 发票号码/附件/备注 | 请求：开票 `invoice_number/invoice_img/remark`；响应：`invoice_number/invoice_img/invoice_remark` | 关联发票号码、附件与备注；来源：关联发票字段，经控制器补全附件 path/value/file_name；不是预约备注 | E-001、E-002 |
 
 #### 类型、默认、校验和编辑边界
 
