@@ -1,7 +1,7 @@
 interface:
   display_name: "模块功能整理 v0.0.1"
   short_description: "整理模块功能与测试预期，生成支持新需求方案和代码修改的独立 AI 上下文"
-  default_prompt: "请使用 $code-module-feature-map 整理指定模块，生成开发测试说明和独立 AI 上下文；人版业务流程表保持五列，第3节按页面依次用按钮名称、按钮操作条件、关键规则、触发结果四列简洁描述功能，保留字母图表和三列报表，功能更新后同步两份文档。"
+  default_prompt: "请使用 $code-module-feature-map 整理指定模块，生成开发测试说明和独立 AI 上下文；人版业务流程表保持五列，第3节按页面依次用按钮名称、按钮操作条件、关键规则、触发结果四列简洁描述功能，保留字母图表和三列报表；生成校验后在目标项目AGENTS.md登记模块及AI文档，功能更新后同步文档与索引。"
 policy:
   allow_implicit_invocation: false
 
