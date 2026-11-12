@@ -1,154 +1,155 @@
 ---
 schema_version: 1
 module_id: tally
-analysis_id: tally-skill-trial-20261111-03
+analysis_id: tally-skill-trial-20261112-01
 document_type: developer-guide
 source_root: /www/storage
 git_root: /www/storage/web
 source_commit: 3c40a18befda1f0c919e789515852f078b2a1d1c
 source_dirty: true
-verification: static-code-caller-tracing-and-document-consistency
+verification: static-code-table-effects-and-document-consistency
 coverage: partial
-verified_date: '2026-11-11'
+verified_date: '2026-11-12'
 project_rules_sha256: c83d9bbd7193c311d9f7543edecc56cda009de3f6ae373a5a60fa29d9a026a46
-analyzed_evidence_sha256: caa144f593b54b2467516dfaed26344ea5f25db5c4fce83ed7758c5b5e1494ce
+analyzed_evidence_sha256: 4b70fde05d22e323137304387b5ff8f4e0f2a92ccd807bdf873dfb2d91e705f6
+evidence_digest_format: SHA256 of E-ID<TAB>repo-relative-path<TAB>file-SHA256<LF>,
+  ordered by E-ID
 ---
 
 # 理货：开发测试功能说明
 
-先看第2节首张全流程图，理解入口、状态和出口，再按五列表定位发起身份、页面与下一步。第3节逐页查看按钮条件、关键规则和触发结果，第4～6节查字段、Map与可用条件，第7节找报表，第9节定位证据。后续AI读取独立的 [AI上下文](ai-context.md)，功能更新后同步本说明。
+先看第2节首张全流程图，理解入口、状态和出口，再按七列表查看发起身份、操作地点、关联表、数据变化与下一步。第3节逐页查看按钮条件、关键规则和触发结果，第4～6节查字段、Map与可用条件，第7节找报表，第9节定位证据。后续AI读取独立的 [AI上下文](ai-context.md)，功能更新后同步本说明。
 
 ## 1. 模块范围
 
 覆盖storage现有理货任务、理货记录、到场/提单/父入货单完成与撤销、直接委托理货、来源派单与取消、媒体及相关统计。关联来源业务仅覆盖理货衔接，不代表已分析全部来源CRUD、收费/退款或叉车/司机完整流程。
 
-本次按最新skill从独立AI事实重新生成，核对117个源码证据指纹，并复核来源派单、收尾和单据完成的关键入口；其余事实沿用同一指纹基线。主图以主业务流程为主，逐条标明入口，详细字段、规则及按钮保留。源码含既有未提交的理货与报表改动；未运行页面、业务接口、数据库、迁移或业务测试。部署DDL、实际字典/配置、设备表现及角色岗位绑定均todo，静态推导的检查点不能写成业务验收通过。
+本次核对原有117份证据指纹，并复核主要写入链，新增21份表映射及服务证据；按最新约定从独立AI事实重新生成动作主图与七列表。其余事实沿用同一指纹基线。源码含既有未提交的理货与报表改动；未运行页面、业务接口、数据库、迁移或业务测试。部署DDL、实际字典/配置、设备表现及角色岗位绑定均todo，静态推导的检查点不能写成业务验收通过。
 
 电脑站内链接以后台应用根为基准，手机 `/pages/...` 是应用内路由。代码入口相对于本文目录为 `../../../../storage/web/...`；弹窗/抽屉以进入路径说明。菜单SQL与首页分组仅证明入口声明，不能直接证明真实岗位授权。
 
 ## 2. 业务流程
 
-理货有三条创建链：来源单据自动派任务、电脑/手机创建独立箱状态任务、直接委托追加记录；直接委托理货不创建或完成理货任务。本趟到场完成、提单入货完成、父入货单完成相互独立，不能以一次“完成”概括全部层级。
+创建任务与完成任务构成任务主线；到场可先多次追加理货，来源收尾可取消待处理任务。直接委托理货独立写记录和箱状态；提单与父入货单从各自入口完成/撤销，不能与任务完成混为一次操作。
 
-### 2.1 业务全流程总览
+### 2.1 主业务流程总览
 
-图标识：`FLOW-OVERVIEW`。以任务理货、独立委托理货、单据完成与撤销为主，逐条标明操作端及页面/触发入口，保留处理阶段、关键分支和结果。辅助操作按用途归组；29项业务动作、52条已确认身份/入口记录在下方五列表展开，字母为阶段节点，多个功能ID可对应同一节点。
+图标识：`FLOW-OVERVIEW`。业务动作是主线，步骤旁的灰色注释说明操作地点；具体入口及数据影响在下方七列表展开，同类动作可共用图中节点。
 
 ```mermaid
 flowchart TB
-  subgraph TASK["任务理货：来源派单或手工创建"]
-    A["A 电脑·货物到场登记 / 重箱到场 / 作业任务快捷重箱<br/>到场保存或安排掏箱，按来源派单"]
-    A1["A1 电脑·理货任务中心 / 手机·理货任务<br/>新增箱状态任务"]
-    B["B 电脑·理货任务中心 / 手机·理货任务<br/>查看任务列表与详情"]
-    C["C 按类型理货<br/>到场追加或本趟完成；通用或电脑批量完成"]
-    D(["D 任务完成，按类型回写来源 / 到场"])
-    B1["B1 电脑·提货单完成 / 重箱到场允许删除"]
-    D1(["D1 相关待处理任务取消，流程终止"])
-    A --> B
-    A1 --> B
-    B -->|待处理任务| C
-    C -->|完成| D
-    C -->|仅追加，继续处理| B
-    B -->|相关任务仍待处理且来源允许收尾| B1 --> D1
+  subgraph TASK["任务理货主线"]
+    direction LR
+    A["A 创建理货任务"] --> B["B 完成理货任务"] --> C(["C 任务完成"])
+    A -->|到场可先追加| A1["A1 追加到场理货记录"] --> B
+    A1 -->|继续追加| A1
+    A -->|仅待处理且来源允许| B1["B1 取消待处理任务"] --> C1(["C1 取消终止"])
+    NA["电脑·货物到场登记 / 重箱到场 / 作业任务快捷重箱<br/>电脑或手机·理货任务页新增箱状态"] -.->|操作地点| A
+    NB["电脑·理货任务中心<br/>手机·到场任务详情；新增箱状态的后续完成请求"] -.->|操作地点| B
+    NA1["手机·理货任务详情→到场理货表单"] -.->|操作地点| A1
+    NB1["电脑·提货单完成 / 重箱到场允许删除"] -.->|操作地点| B1
   end
-  subgraph ORDER["直接委托理货：独立于任务"]
-    G["G 手机·理货委托列表与详情<br/>电脑·出口委托单→更多（加固）"]
-    H["H 手机直接理货 / 电脑或手机整单加固"]
-    I(["I 更新记录与箱状态，不创建或完成任务"])
-    G --> H --> I
+  subgraph ORDER["独立委托理货"]
+    direction LR
+    D["D 提交委托理货 / 整单加固"] --> E(["E 记录与箱状态更新"])
+    ND["手机·理货委托详情 / 表单<br/>电脑·出口委托单→更多（仅整单加固）"] -.->|操作地点| D
   end
-  subgraph DOCUMENT["单据完成与撤销：各自独立校验"]
-    J["J 手机·任务详情 / 理货委托详情<br/>电脑·出口委托单→更多"]
-    K(["K 提单已完成 ↔ 未完成<br/>撤销保留任务与本趟到场结果"])
-    L["L 电脑·入货单列表 / 详情<br/>手机·纯入货任务详情"]
-    M(["M 父入货单已完成 ↔ 处理中<br/>完成需有到场且全部完成"])
-    J --> K
-    L --> M
+  subgraph DOCUMENT["单据完成与撤销：独立入口、独立状态"]
+    direction LR
+    F["F 完成 / 撤销提单理货"] --> G(["G 提单已完成 ↔ 未完成"])
+    H["H 完成 / 撤销父入货单理货"] --> I(["I 父单已完成 ↔ 处理中"])
+    NF["手机·任务详情 / 理货委托详情（仅完成）<br/>电脑·出口委托单→更多"] -.->|操作地点| F
+    NH["电脑·入货单列表 / 详情<br/>手机·纯入货任务详情"] -.->|操作地点| H
   end
-  subgraph SUPPORT["辅助查询与维护"]
-    N(["N 电脑·理货记录 / 委托详情；手机·日志 / 委托详情 / 表单<br/>查询、导出、媒体与记录维护"])
-    O(["O 电脑·效率统计报表<br/>理货人员统计与明细"])
+  subgraph SUPPORT["辅助操作归组"]
+    N["N 查询、记录维护、媒体与人员统计"]
+    NN["电脑·任务 / 理货记录 / 委托详情 / 效率统计报表<br/>手机·任务 / 委托页及表单"] -.->|操作地点| N
   end
-  Z(["Z 失败：校验拒绝或事务回滚<br/>手机多请求可能部分成功，检查后重试"])
-  C -.->|失败| Z
-  H -.->|失败| Z
-  K -.->|失败| Z
-  M -.->|失败| Z
+  Z(["Z 操作失败：按事务回滚或检查部分成功后重试"])
+  B -->|失败| Z
+  A1 -->|失败| Z
+  D -->|失败| Z
+  F -->|失败| Z
+  H -->|失败| Z
+  classDef place fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 3,color:#475569
+  class NA,NB,NA1,NB1,ND,NF,NH,NN place
 ```
 
-读图说明：任务、本趟到场、提单与父入货单分别完成，单据操作可从图示入口独立发起。手机箱状态新增分两次请求，失败后需检查已保存结果；手机进口任务详情仅供查看。来源派单、删除及附件联动的具体条件见下表和对应页面。虚线为异常去向，失败说明适用于写入操作。
+实线表示业务流转，标有“操作地点”的灰色虚线仅说明在哪里操作。任务、本趟到场、提单、父入货单状态独立；提单可从独立入口操作，父入货单完成须有到场且全部完成。手机新增箱状态分两次请求，手机进口任务详情仍只读。各步骤实际写入见下表。
 
-### 2.2 任务入口、派单与处理
+数据库列按代码映射列出业务主表及核心联动，物理库名、实际部署DDL和运行效果待核验。来源页面自身的完整CRUD、收费/司机等外围流程以及统一鉴权、配置和框架操作审计不在本表逐项展开。数据列区分新增、更新、逻辑删除与仅读取；单次事务回滚不代表手机多请求或OSS对象也全部回滚。
 
-| 业务动作 | 发起角色/来源 | 页面入口 | 关键处理 | 结果与下一步 |
-| --- | --- | --- | --- | --- |
-| F-024 来源业务生成理货任务 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[货物到场登记](/export/cargo-arrival)→新增→保存 | 保存来源并按loading/storage派到场理货；FLOW-OVERVIEW / A | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
-| F-024 来源业务生成理货任务 | 后台授权用户（具体岗位todo） | 电脑→进口重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→新增→选择安排掏箱→保存 | unload_inbound才派掏箱理货，与落箱独立；FLOW-OVERVIEW / A | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
-| F-024 来源业务生成理货任务 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→作业任务 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/jobTask/index.vue)→重箱到场→保存 | 复用重箱新增及掏箱安排字段，选择安排才派任务；FLOW-OVERVIEW / A | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
-| F-024 来源业务生成理货任务 | 后台授权用户（具体岗位todo） | 电脑→重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→安排掏箱 | 锁来源并拦截有效任务重复安排，创建pending掏箱理货；FLOW-OVERVIEW / A | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
-| F-024 来源业务生成理货任务 | 来源服务兼容调用者（后台身份与权限需合法，正常yes页面未发现） | 自动触发代码 [代码入口](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/pickuporder/service/impl/ImPickupOrderServiceImpl.java)；电脑提货表单 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/pickupOrder/form.vue)固定no | 仅来源请求needTally=yes创建出库理货，正常新建no不触发；FLOW-OVERVIEW / A | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
-| F-003 创建箱号状态任务 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→箱号状态更新→创建确定 | 选择箱档案创建pending箱状态任务，手机另发完成请求；FLOW-OVERVIEW / A1 | 新增pending任务 → 电脑后续完成；手机第二请求失败时保留已建任务。 |
-| F-003 创建箱号状态任务 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→新增→提交 | 选择箱档案创建pending箱状态任务，手机另发完成请求；FLOW-OVERVIEW / A1 | 新增pending任务 → 电脑后续完成；手机第二请求失败时保留已建任务。 |
-| F-001 查询理货任务 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→搜索/重置/刷新/分页 | 组合筛选并恢复已确认缓存，列表/角标同条件；按来源返回上次人员；FLOW-OVERVIEW / B | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
-| F-001 查询理货任务 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→搜索/筛选/页签 | 组合筛选并恢复已确认缓存，列表/角标同条件；按来源返回上次人员；FLOW-OVERVIEW / B | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
-| F-001 查询理货任务 | 手机旧路由进入者（系统登录） | 手机→旧装箱列表（应用内 `/pages/tally/loading/index`）→自动转任务列表 | 旧列表自动转统一任务查询，保留已定义路由筛选；FLOW-OVERVIEW / B | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
-| F-001 查询理货任务 | 手机旧路由进入者（系统登录） | 手机→旧掏箱列表（应用内 `/pages/tally/unloading/index`）→自动转任务列表 | 旧列表自动转统一任务查询，保留已定义路由筛选；FLOW-OVERVIEW / B | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
-| F-001 查询理货任务 | 手机旧到场登记入口使用者（首页入口todo） | 手机→旧到场登记详情→按箱进入理货（应用内 `/pages/tally/cargoArrival/detail?id={到场ID}`） | 带到场来源单号/作业类型/箱号/pending跳任务列表；不直接完成；FLOW-OVERVIEW / B | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
-| F-002 查看任务详情与理货单 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→详情 | 读取来源上下文、任务结果及理货要求；手机非到场详情只读；FLOW-OVERVIEW / B | 显示任务与来源 → 依类型进入到场或电脑通用完成；手机进口只读。 |
-| F-002 查看任务详情与理货单 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`） | 读取来源上下文、任务结果及理货要求；手机非到场详情只读；FLOW-OVERVIEW / B | 显示任务与来源 → 依类型进入到场或电脑通用完成；手机进口只读。 |
-| F-025 从进口提货详情进入理货任务 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→进口提货详情→去理货任务（应用内 `/pages/tally/importPickup/detail?id={提货单ID}`） | 仅进行中提货带来源/类型/单号/pending条件转统一任务列表；FLOW-OVERVIEW / B | 进入筛选后的统一列表 → 查看任务；手机进口完成入口仍待明确。 |
-| F-004 完成通用理货任务 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→非到场完成任务→确定 | 仅pending；校验类型明细及提货行归属，写任务子项并按源回写；FLOW-OVERVIEW / C | 任务completed、人/时间及来源结果写入 → 查询日志/统计；提货库存等由来源另收尾。 |
-| F-004 完成通用理货任务 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→新增箱状态→提交（创建后连续完成） | 仅pending；校验类型明细及提货行归属，写任务子项并按源回写；FLOW-OVERVIEW / C | 任务completed、人/时间及来源结果写入 → 查询日志/统计；提货库存等由来源另收尾。 |
-| F-005 追加到场理货记录 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→更新理货状态→表单（应用内 `/pages/tally/tallyRecord/form?taskId={任务ID}`） | 按箱/提单追加普通到场记录；手机多箱为逐个独立请求；FLOW-OVERVIEW / C | 新增日志与适用箱状态 → 返回详情；本趟仍需专用完成，后续箱失败可能部分成功。 |
-| F-006 完成本趟到场理货 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→到场完成任务→确认/核对/位置 | 按配置核对或选位置，无需输入时确认；纯入货免位置，提单不随本趟完成；FLOW-OVERVIEW / C | 任务与到场完成、日志/快照及绑定货物同步 → 另行判断父入货或提单是否完成。 |
-| F-006 完成本趟到场理货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→完成到场登记理货 | 按配置核对或选位置，无需输入时确认；纯入货免位置，提单不随本趟完成；FLOW-OVERVIEW / C | 任务与到场完成、日志/快照及绑定货物同步 → 另行判断父入货或提单是否完成。 |
-| F-026 批量完成理货 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→勾选当前页→批量完成理货 | 当前页pending≤100；全部校验后按到场专用/其他通用分流，同一事务；FLOW-OVERVIEW / C | 全批成功关闭/刷新/清选 → 查看结果；任一失败回滚整批并保留草稿重试。 |
-| F-029 来源收尾取消待处理理货任务 | 后台来源操作触发的系统动作（岗位todo） | 电脑→提货单 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/pickupOrder/index.vue)→提货完成→确认完成 | 来源提货完成事务置completed、取消pending理货、累计出库库存；上传附件不触发；FLOW-OVERVIEW / B1 | 待处理理货cancelled终止 → 提货来源completed且累计库存，或重箱来源按删除规则回滚。 |
-| F-029 来源收尾取消待处理理货任务 | 后台来源操作触发的系统动作（岗位todo） | 电脑→重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→删除→原因/检查→确认 | 仅允许删除时取消pending理货，并按来源规则回滚位置/状态和时间线；FLOW-OVERVIEW / B1 | 待处理理货cancelled终止 → 提货来源completed且累计库存，或重箱来源按删除规则回滚。 |
+### 2.2 任务创建、完成与来源取消
+
+| 业务动作 | 发起角色/来源 | 操作地点 | 关键处理 | 关联数据库/表 | 生成/变更的数据 | 结果与下一步 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F-024 来源业务生成理货任务 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[货物到场登记](/export/cargo-arrival)→新增→保存 | 保存来源并按loading/storage派到场理货；FLOW-OVERVIEW / A | 来源新增 `ex_cargo_arrival` 及有提交时的 `ex_cargo_arrival_item`；另新增 `tk_tally_task` | 保存到场来源及货物行，生成一条arrival_loading或arrival_storage/pending任务，以sourceId关联到场。名为createInitialTallyRecord的方法只建任务，不创建ex_tally_record。 | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
+| F-024 来源业务生成理货任务 | 后台授权用户（具体岗位todo） | 电脑→进口重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→新增→选择安排掏箱→保存 | unload_inbound才派掏箱理货，与落箱独立；FLOW-OVERVIEW / A | 来源新增 `im_heavy_entry`、`tk_job_task`；选择unload_inbound时另新增 `tk_tally_task` | 来源重箱记录/落箱作业任务由来源保存产生；仅选择安排掏箱时另建unload_inbound/pending理货任务，以sourceId、containerProfileId关联；与落箱执行状态独立。 | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
+| F-024 来源业务生成理货任务 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→作业任务 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/jobTask/index.vue)→重箱到场→保存 | 复用重箱新增及掏箱安排字段，选择安排才派任务；FLOW-OVERVIEW / A | 来源新增 `im_heavy_entry`、`tk_job_task`；选择unload_inbound时另新增 `tk_tally_task` | 来源重箱记录/落箱作业任务由来源保存产生；仅选择安排掏箱时另建unload_inbound/pending理货任务，以sourceId、containerProfileId关联；与落箱执行状态独立。 | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
+| F-024 来源业务生成理货任务 | 后台授权用户（具体岗位todo） | 电脑→重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→安排掏箱 | 锁来源并拦截有效任务重复安排，创建pending掏箱理货；FLOW-OVERVIEW / A | 读取并更新 `im_heavy_entry`，新增 `tk_tally_task`；按箱档案及现有任务检查重复 | 现有重箱到场inboundType改unload_inbound，并生成一条掏箱pending任务，以sourceId/箱档案关联来源；不因安排掏箱完成原落箱任务。 | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
+| F-024 来源业务生成理货任务 | 来源服务兼容调用者（后台身份与权限需合法，正常yes页面未发现） | 自动触发代码 [代码入口](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/pickuporder/service/impl/ImPickupOrderServiceImpl.java)；电脑提货表单 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/pickupOrder/form.vue)固定no | 仅来源请求needTally=yes创建出库理货，正常新建no不触发；FLOW-OVERVIEW / A | 来源新增 `im_pickup_order` 及其明细；needTally=yes时新增 `tk_tally_task` | 仅兼容yes分支新增pickup_outbound/pending任务，以sourceType/sourceId关联提货单；来源保存其单据和明细。当前电脑表单固定no，正常新建不派该任务。 | 生成来源任务并发布事件 → 从统一任务页处理；普通电脑提货新增默认不派理货。 |
+| F-003 创建箱号状态任务 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→箱号状态更新→创建确定 | 选择箱档案创建pending箱状态任务，手机另发完成请求；FLOW-OVERVIEW / A | 新增 `tk_tally_task`；箱档案选择器读取 `tk_container_profile`，创建接口不等于统一完成箱档案校验 | 新增一条任务，生成id及TT任务号，保存 `containerProfileId`，`taskStatus=pending`；此请求不生成任务子项或理货记录。手机后续完成是另一请求。 | 新增pending任务 → 电脑后续完成；手机第二请求失败时保留已建任务。 |
+| F-003 创建箱号状态任务 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→新增→提交 | 选择箱档案创建pending箱状态任务，手机另发完成请求；FLOW-OVERVIEW / A | 新增 `tk_tally_task`；箱档案选择器读取 `tk_container_profile`，创建接口不等于统一完成箱档案校验 | 新增一条任务，生成id及TT任务号，保存 `containerProfileId`，`taskStatus=pending`；此请求不生成任务子项或理货记录。手机后续完成是另一请求。 | 新增pending任务 → 电脑后续完成；手机第二请求失败时保留已建任务。 |
+| F-004 完成通用理货任务 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→非到场完成任务→确定 | 仅pending；校验类型明细及提货行归属，写任务子项并按源回写；FLOW-OVERVIEW / B | 新增 `tk_tally_task_item`、更新 `tk_tally_task`；按源回写 `im_heavy_entry`/`tk_container_profile`/`tk_container_timeline` 或 `im_pickup_order`/明细；旧到场通用链另写 `ex_tally_record` 等 | 逐项生成taskId关联明细，任务置completed并写人/时间。掏箱回填unloadTime及空箱状态/时间线；未收尾提货回填明细件重、pickupStatus=tally_completed，暂不累计库存；独立箱状态更新档案/时间线。旧到场通用链与专用核对不同；单事务失败回滚。 | 任务completed、人/时间及来源结果写入 → 查询日志/统计；提货库存等由来源另收尾。 |
+| F-004 完成通用理货任务 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→新增箱状态→提交（创建后连续完成） | 仅pending；校验类型明细及提货行归属，写任务子项并按源回写；FLOW-OVERVIEW / B | 新增 `tk_tally_task_item`，更新 `tk_tally_task`、`tk_container_profile`，新增 `tk_container_timeline` | 已建箱状态任务写完成子项（taskId→任务id），置completed/完成人/时间；更新箱bizStatus及latest*，追加tally_status时间线。不新增ex_tally_record；第二请求失败不回滚上一请求已建pending任务。 | 任务completed、人/时间及来源结果写入 → 查询日志/统计；提货库存等由来源另收尾。 |
+| F-005 追加到场理货记录 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→更新理货状态→表单（应用内 `/pages/tally/tallyRecord/form?taskId={任务ID}`） | 按箱/提单追加普通到场记录；手机多箱为逐个独立请求；FLOW-OVERVIEW / A1 | 新增 `ex_tally_record`；有核对行时新增 `ex_tally_record_item`；条件更新 `ex_cargo_arrival`、`ex_entrust_order_container`、`tk_container_profile`；读取所属 `ex_inbound_record` 检查可编辑 | 每次提交追加TR记录及可选核对行，以 `arrivalId` 归属到场、`tallyRecordId` 关联核对行；有箱状态时同步spreadStatus/bizStatus，首次补spreadFinishTime。仅cargoCompleted=1才回写到场completed；不自动完成任务。手机逐箱多请求可部分成功。 | 新增日志与适用箱状态 → 返回详情；本趟仍需专用完成，后续箱失败可能部分成功。 |
+| F-006 完成本趟到场理货 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→到场完成任务→确认/核对/位置 | 按配置核对或选位置，无需输入时确认；纯入货免位置，提单不随本趟完成；FLOW-OVERVIEW / B | 更新 `tk_tally_task`、`ex_cargo_arrival`、该到场的 `ex_tally_record`；新增完成日志/条件性核对记录与 `ex_tally_record_item`；有绑定时读取 `ex_entrust_inbound_rel`、`ex_inbound_record_item` 等并逻辑删除/重建 `ex_entrust_order_cargo_item` | 任务taskStatus=completed、arrivalCompleted=1，写完成人/时间；到场tallyStatus=completed，现存理货记录cargoCompleted=1并按路径补位置。追加arrival_tally_completed日志及到场快照；核对记录/子行按提交生成，有绑定时按核对汇总重建委托货物。此专用链不新增tk_tally_task_item，提单/父单不随之自动完成；同事务失败回滚。 | 任务与到场完成、日志/快照及绑定货物同步 → 另行判断父入货或提单是否完成。 |
+| F-006 完成本趟到场理货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→完成到场登记理货 | 按配置核对或选位置，无需输入时确认；纯入货免位置，提单不随本趟完成；FLOW-OVERVIEW / B | 更新 `tk_tally_task`、`ex_cargo_arrival`、该到场的 `ex_tally_record`；新增完成日志/条件性核对记录与 `ex_tally_record_item`；有绑定时读取 `ex_entrust_inbound_rel`、`ex_inbound_record_item` 等并逻辑删除/重建 `ex_entrust_order_cargo_item` | 任务taskStatus=completed、arrivalCompleted=1，写完成人/时间；到场tallyStatus=completed，现存理货记录cargoCompleted=1并按路径补位置。追加arrival_tally_completed日志及到场快照；核对记录/子行按提交生成，有绑定时按核对汇总重建委托货物。此专用链不新增tk_tally_task_item，提单/父单不随之自动完成；同事务失败回滚。 | 任务与到场完成、日志/快照及绑定货物同步 → 另行判断父入货或提单是否完成。 |
+| F-026 批量完成理货 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→勾选当前页→批量完成理货 | 当前页pending≤100；全部校验后按到场专用/其他通用分流，同一事务；FLOW-OVERVIEW / B | 更新 `tk_tally_task`；通用分支新增 `tk_tally_task_item` 并按源回写；到场分支涉及 `ex_tally_record`/核对行及条件性绑定委托货物重建，详见F-004/F-006 | 当前页最多100项按类型逐项调用：非到场生成任务子项并回写来源，到场专用链写完成记录/核对及状态、不自动新增任务子项。所有条目共一个事务，任一失败整批回滚。 | 全批成功关闭/刷新/清选 → 查看结果；任一失败回滚整批并保留草稿重试。 |
+| F-029 来源收尾取消待处理理货任务 | 后台来源操作触发的系统动作（岗位todo） | 电脑→提货单 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/pickupOrder/index.vue)→提货完成→确认完成 | 来源提货完成事务置completed、取消pending理货、累计出库库存；上传附件不触发；FLOW-OVERVIEW / B1 | 更新 `im_pickup_order`、相关 `tk_tally_task`；读取 `im_pickup_order_item` 并更新 `im_entrust_order_container` | 提货单pickupStatus=completed；仅该源pending理货改cancelled；按提货明细累加委托箱outboundPieces/outboundWeight。上传出库单只改附件，不走该取消/累计链。 | 待处理理货cancelled终止 → 提货来源completed且累计库存，或重箱来源按删除规则回滚。 |
+| F-029 来源收尾取消待处理理货任务 | 后台来源操作触发的系统动作（岗位todo） | 电脑→重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→删除→原因/检查→确认 | 仅允许删除时取消pending理货，并按来源规则回滚位置/状态和时间线；FLOW-OVERVIEW / B1 | 更新 `tk_tally_task`、`tk_job_task`、`tk_container_profile`、相关 `im_entrust_order_container`；逻辑删除 `im_heavy_entry`，新增 `tk_container_timeline`，有占用时释放 `st_storage_location` | 删除检查通过后取消pending理货和来源作业任务，恢复箱档案快照、重算委托箱到场状态；保留删除原因/entry_deleted时间线并逻辑删除来源，按归属释放库位。已作业/完成理货等阻断时不执行本次变更；不同于删除理货记录。 | 待处理理货cancelled终止 → 提货来源completed且累计库存，或重箱来源按删除规则回滚。 |
 
 ### 2.3 独立委托理货与加固
 
-| 业务动作 | 发起角色/来源 | 页面入口 | 关键处理 | 结果与下一步 |
-| --- | --- | --- | --- | --- |
-| F-011 查询理货委托单 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部导航→委托单（应用内 `/pages/tally/entrustOrder/index`） | 按委托状态及单号/箱号筛选，委托状态与理货完成状态独立；FLOW-OVERVIEW / G | 委托列表更新 → 查看理货上下文或卡片日志。 |
-| F-012 查看委托理货上下文 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`） | 汇总委托、最近箱记录及历史，不创建任务；FLOW-OVERVIEW / G | 上下文展示 → 按箱/提单更新，或独立完成提单、整单加固。 |
-| F-013 提交委托单理货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→按箱/按提单→表单（应用内 `/pages/tally/entrustOrder/form?orderId={委托ID}`）→提交 | 按箱或整提单一次事务追加记录并同步箱状态，不创建/完成任务；FLOW-OVERVIEW / H | 记录及箱状态更新 → 返回详情继续处理；提单完成与任务状态不随之改变。 |
-| F-016 本单装箱完成或全部已加固 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→全部已加固 | 跳过已加固/铅封箱，其余追加已加固记录；无候选箱拒绝；FLOW-OVERVIEW / H | 可处理箱写reinforced日志 → 回详情/列表检查；全部跳过则服务拒绝。 |
-| F-016 本单装箱完成或全部已加固 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→本单装箱完成 | 跳过已加固/铅封箱，其余追加已加固记录；无候选箱拒绝；FLOW-OVERVIEW / H | 可处理箱写reinforced日志 → 回详情/列表检查；全部跳过则服务拒绝。 |
+| 业务动作 | 发起角色/来源 | 操作地点 | 关键处理 | 关联数据库/表 | 生成/变更的数据 | 结果与下一步 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F-013 提交委托单理货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→按箱/按提单→表单（应用内 `/pages/tally/entrustOrder/form?orderId={委托ID}`）→提交 | 按箱或整提单一次事务追加记录并同步箱状态，不创建/完成任务；FLOW-OVERVIEW / D | 读取 `ex_entrust_order`、`ex_entrust_order_container`；新增 `ex_tally_record`，同步更新委托箱及 `tk_container_profile` | 一次多箱事务逐箱新增entrust_loading记录，以orderId/containerProfileId关联委托与箱；同步spreadStatus/bizStatus，首次补spreadFinishTime。不新增或完成tk_tally_task，不修改receiveStatus；单请求失败整批回滚。 | 记录及箱状态更新 → 返回详情继续处理；提单完成与任务状态不随之改变。 |
+| F-016 本单装箱完成或全部已加固 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→全部已加固 | 跳过已加固/铅封箱，其余追加已加固记录；无候选箱拒绝；FLOW-OVERVIEW / D | 读取 `ex_entrust_order`、`ex_entrust_order_container`、`ex_tally_record`；为需处理箱新增记录并更新委托箱及 `tk_container_profile` | 仅未sealed/reinforced的箱追加entrust_loading/reinforced记录，并同步箱状态；全跳过则拒绝，部分非法箱使单请求事务回滚。不新增任务、任务子项或提单完成标记。 | 可处理箱写reinforced日志 → 回详情/列表检查；全部跳过则服务拒绝。 |
+| F-016 本单装箱完成或全部已加固 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→本单装箱完成 | 跳过已加固/铅封箱，其余追加已加固记录；无候选箱拒绝；FLOW-OVERVIEW / D | 读取 `ex_entrust_order`、`ex_entrust_order_container`、`ex_tally_record`；为需处理箱新增记录并更新委托箱及 `tk_container_profile` | 仅未sealed/reinforced的箱追加entrust_loading/reinforced记录，并同步箱状态；全跳过则拒绝，部分非法箱使单请求事务回滚。不新增任务、任务子项或提单完成标记。 | 可处理箱写reinforced日志 → 回详情/列表检查；全部跳过则服务拒绝。 |
 
 ### 2.4 提单与父入货单完成、撤销
 
-| 业务动作 | 发起角色/来源 | 页面入口 | 关键处理 | 结果与下一步 |
-| --- | --- | --- | --- | --- |
-| F-007 从任务完成提单入货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→完成提单入货 | 校验委托及严格绑定门槛，写任务提单标记与委托状态；取消状态保护仍有缺口；FLOW-OVERVIEW / K | 委托完成及本任务提单标记1 → 可独立撤销提单层，不等于本趟完成。 |
-| F-008 撤销任务提单完成 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→撤销提单理货完成 | 只撤销本任务提单标记及直接关联委托完成，不回退本趟结果；FLOW-OVERVIEW / K | 本任务标记0及委托incomplete → 本趟/箱/媒体保留，可后续重新确认。 |
-| F-014 从委托完成提单入货 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→完成理货 | 严格模式检查绑定入货完成，再写委托receiveStatus与完成日志；FLOW-OVERVIEW / K | 委托receiveStatus=completed并写日志 → 电脑可取消；不等于箱加固或业务放行。 |
-| F-014 从委托完成提单入货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→完成提单入货 | 严格模式检查绑定入货完成，再写委托receiveStatus与完成日志；FLOW-OVERVIEW / K | 委托receiveStatus=completed并写日志 → 电脑可取消；不等于箱加固或业务放行。 |
-| F-015 从委托取消理货完成 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→取消理货 | 只将委托入货状态恢复incomplete，不重置关联任务提单标记；FLOW-OVERVIEW / K | 委托incomplete → 可继续提单层处理；历史记录及其他任务标记保留。 |
-| F-009 完成入货单理货 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→列表行→完成入货单理货 | 父单至少一到场且全部完成，锁父单和到场后置completed；FLOW-OVERVIEW / M | 父状态completed → 相关理货写入受限制；修改前先撤销父完成，并发边界待验。 |
-| F-009 完成入货单理货 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→详情抽屉→完成入货单理货 | 父单至少一到场且全部完成，锁父单和到场后置completed；FLOW-OVERVIEW / M | 父状态completed → 相关理货写入受限制；修改前先撤销父完成，并发边界待验。 |
-| F-009 完成入货单理货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→纯入货路径→完成入货单理货 | 父单至少一到场且全部完成，锁父单和到场后置completed；FLOW-OVERVIEW / M | 父状态completed → 相关理货写入受限制；修改前先撤销父完成，并发边界待验。 |
-| F-010 撤销入货单理货完成 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→列表行→撤销理货完成 | 锁父单，仅将completed恢复processing；FLOW-OVERVIEW / M | 父状态processing → 可继续相关编辑；既有到场及任务完成结果保留。 |
-| F-010 撤销入货单理货完成 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→详情抽屉→撤销理货完成 | 锁父单，仅将completed恢复processing；FLOW-OVERVIEW / M | 父状态processing → 可继续相关编辑；既有到场及任务完成结果保留。 |
-| F-010 撤销入货单理货完成 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→纯入货路径→撤销理货完成 | 锁父单，仅将completed恢复processing；FLOW-OVERVIEW / M | 父状态processing → 可继续相关编辑；既有到场及任务完成结果保留。 |
+| 业务动作 | 发起角色/来源 | 操作地点 | 关键处理 | 关联数据库/表 | 生成/变更的数据 | 结果与下一步 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F-007 从任务完成提单入货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→完成提单入货 | 校验委托及严格绑定门槛，写任务提单标记与委托状态；取消状态保护仍有缺口；FLOW-OVERVIEW / F | 更新 `tk_tally_task`、有直接委托时更新 `ex_entrust_order`；新增 `ex_tally_record`；读取 `ex_cargo_arrival` 及绑定入货关系/父单 | 本任务cargoCompleted=1，直接关联委托receiveStatus=completed，追加cargo_completed日志；不完成或重置本趟/任务执行状态。绑定门槛失败则事务回滚。 | 委托完成及本任务提单标记1 → 可独立撤销提单层，不等于本趟完成。 |
+| F-008 撤销任务提单完成 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→撤销提单理货完成 | 只撤销本任务提单标记及直接关联委托完成，不回退本趟结果；FLOW-OVERVIEW / F | 条件更新 `tk_tally_task`，更新 `ex_entrust_order`；读取 `ex_cargo_arrival` 验证直接关联 | 本任务cargoCompleted由1回0，直接关联委托receiveStatus=incomplete；不新增撤销日志，不删除既有理货记录，不回退任务或本趟到场结果。 | 本任务标记0及委托incomplete → 本趟/箱/媒体保留，可后续重新确认。 |
+| F-014 从委托完成提单入货 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→完成理货 | 严格模式检查绑定入货完成，再写委托receiveStatus与完成日志；FLOW-OVERVIEW / F | 读取 `ex_entrust_order` 及 `ex_entrust_inbound_rel`、绑定 `ex_inbound_record`；条件更新委托；新增 `ex_tally_record` | 委托receiveStatus从原状态改completed，成功时新增cargo_completed日志，以orderId归属；不修改任何任务cargoCompleted或本趟到场结果。 | 委托receiveStatus=completed并写日志 → 电脑可取消；不等于箱加固或业务放行。 |
+| F-014 从委托完成提单入货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→完成提单入货 | 严格模式检查绑定入货完成，再写委托receiveStatus与完成日志；FLOW-OVERVIEW / F | 读取 `ex_entrust_order` 及 `ex_entrust_inbound_rel`、绑定 `ex_inbound_record`；条件更新委托；新增 `ex_tally_record` | 委托receiveStatus从原状态改completed，成功时新增cargo_completed日志，以orderId归属；不修改任何任务cargoCompleted或本趟到场结果。 | 委托receiveStatus=completed并写日志 → 电脑可取消；不等于箱加固或业务放行。 |
+| F-015 从委托取消理货完成 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→取消理货 | 只将委托入货状态恢复incomplete，不重置关联任务提单标记；FLOW-OVERVIEW / F | 条件更新 `ex_entrust_order` | 委托receiveStatus由completed回incomplete；不新增撤销日志，不删除记录/媒体，不统一回退各任务cargoCompleted。 | 委托incomplete → 可继续提单层处理；历史记录及其他任务标记保留。 |
+| F-009 完成入货单理货 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→列表行→完成入货单理货 | 父单至少一到场且全部完成，锁父单和到场后置completed；FLOW-OVERVIEW / H | 读取并锁定 `ex_inbound_record`、其 `ex_cargo_arrival`；更新 `ex_inbound_record` | 至少一趟且全部到场completed时，仅把父入货单tallyStatus改为completed；不新增理货记录、任务子项或完成日志。 | 父状态completed → 相关理货写入受限制；修改前先撤销父完成，并发边界待验。 |
+| F-009 完成入货单理货 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→详情抽屉→完成入货单理货 | 父单至少一到场且全部完成，锁父单和到场后置completed；FLOW-OVERVIEW / H | 读取并锁定 `ex_inbound_record`、其 `ex_cargo_arrival`；更新 `ex_inbound_record` | 至少一趟且全部到场completed时，仅把父入货单tallyStatus改为completed；不新增理货记录、任务子项或完成日志。 | 父状态completed → 相关理货写入受限制；修改前先撤销父完成，并发边界待验。 |
+| F-009 完成入货单理货 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→纯入货路径→完成入货单理货 | 父单至少一到场且全部完成，锁父单和到场后置completed；FLOW-OVERVIEW / H | 读取并锁定 `ex_inbound_record`、其 `ex_cargo_arrival`；更新 `ex_inbound_record` | 至少一趟且全部到场completed时，仅把父入货单tallyStatus改为completed；不新增理货记录、任务子项或完成日志。 | 父状态completed → 相关理货写入受限制；修改前先撤销父完成，并发边界待验。 |
+| F-010 撤销入货单理货完成 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→列表行→撤销理货完成 | 锁父单，仅将completed恢复processing；FLOW-OVERVIEW / H | 读取并锁定、更新 `ex_inbound_record` | 父入货单tallyStatus由completed回processing；不生成撤销记录，不统一回退子任务、到场或提单结果。 | 父状态processing → 可继续相关编辑；既有到场及任务完成结果保留。 |
+| F-010 撤销入货单理货完成 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→详情抽屉→撤销理货完成 | 锁父单，仅将completed恢复processing；FLOW-OVERVIEW / H | 读取并锁定、更新 `ex_inbound_record` | 父入货单tallyStatus由completed回processing；不生成撤销记录，不统一回退子任务、到场或提单结果。 | 父状态processing → 可继续相关编辑；既有到场及任务完成结果保留。 |
+| F-010 撤销入货单理货完成 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→纯入货路径→撤销理货完成 | 锁父单，仅将completed恢复processing；FLOW-OVERVIEW / H | 读取并锁定、更新 `ex_inbound_record` | 父入货单tallyStatus由completed回processing；不生成撤销记录，不统一回退子任务、到场或提单结果。 | 父状态processing → 可继续相关编辑；既有到场及任务完成结果保留。 |
 
-### 2.5 记录、媒体、日志与人员统计
+### 2.5 查询、记录维护、媒体与统计
 
-| 业务动作 | 发起角色/来源 | 页面入口 | 关键处理 | 结果与下一步 |
-| --- | --- | --- | --- | --- |
-| F-017 移除历史理货图片引用 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→委托理货表单→历史图片移除（应用内 `/pages/tally/entrustOrder/form`） | 按记录归属即时修改历史图片引用，不等待表单提交；FLOW-OVERVIEW / N | 原记录图片引用即时变化 → 可继续表单；不删除OSS文件，最后引用持久化待验。 |
-| F-018 查询理货记录 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→查询 | 按记录或委托/到场范围只读查询；电脑到场单号筛选缺口仍存在；FLOW-OVERVIEW / N | 记录列表显示 → 查看详情、媒体或电脑删除/导出；手机详情限已加载范围。 |
-| F-018 查询理货记录 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→详情→理货记录页签 | 按记录或委托/到场范围只读查询；电脑到场单号筛选缺口仍存在；FLOW-OVERVIEW / N | 记录列表显示 → 查看详情、媒体或电脑删除/导出；手机详情限已加载范围。 |
-| F-018 查询理货记录 | 手机系统登录用户（首页“出口业务”入口，岗位授权todo） | 手机→首页出口业务→出口委托单→详情（应用内 `/pages/storage/export/entrust-order/detail?id={委托ID}`）→理货记录页签 | 按委托关联范围只取前100条展示，非手机理货日志过滤口径；FLOW-OVERVIEW / N | 记录列表显示 → 查看详情、媒体或电脑删除/导出；手机详情限已加载范围。 |
-| F-019 查看理货记录详情 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→详情 | 打开单条记录及媒体只读抽屉，不提供编辑保存；FLOW-OVERVIEW / N | 只读详情显示 → 关闭返回；业务数据不变。 |
-| F-020 删除理货记录 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→工具栏勾选删除/行内删除→确认 | 事务删除记录及核对行，只做部分状态回退，相关一致性见优化建议；FLOW-OVERVIEW / N | 删除后刷新 → 核对子行移除，任务/提单/绑定货物不会完整同步回退。 |
-| F-021 导出理货记录 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→导出 | 按当前查询条件导出，不按勾选集合；FLOW-OVERVIEW / N | 下载匹配记录Excel → 查看结束，不改变状态。 |
-| F-022 批量下载照片视频 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→详情→理货记录→勾选→批量下载照片视频 | 按勾选记录打包媒体，空有效媒体拒绝；FLOW-OVERVIEW / N | 获得媒体ZIP链接 → 浏览器下载结束；手机范围/非H5限制见页面说明。 |
-| F-022 批量下载照片视频 | 手机系统登录用户（首页“出口业务”入口，岗位授权todo） | 手机→首页出口业务→出口委托单→详情（应用内 `/pages/storage/export/entrust-order/detail?id={委托ID}`）→理货记录→下载照片视频 | 仅已加载前100条中有媒体记录，H5打开链接，非H5提示浏览器下载；FLOW-OVERVIEW / N | 获得媒体ZIP链接 → 浏览器下载结束；手机范围/非H5限制见页面说明。 |
-| F-023 查看手机理货日志 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→任务卡片理货日志 | 优先整张入货单，其次委托，再本趟；过滤普通入库日志并连续读取过滤空满页；FLOW-OVERVIEW / N | 日志弹层显示 → 当前分组继续加载或关闭；隐藏入库日志不代表后台无记录。 |
-| F-023 查看手机理货日志 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货委托列表→卡片理货日志（应用内 `/pages/tally/entrustOrder/index`） | 按委托分页读取，隐藏普通入库记录，过滤空满页继续拉取；FLOW-OVERVIEW / N | 日志弹层显示 → 当前分组继续加载或关闭；隐藏入库日志不代表后台无记录。 |
-| F-027 查询理货人员统计 | 后台授权用户（具体岗位todo） | 电脑→[效率统计报表](/report/efficiency)→理货人员统计 | 按理货人及完成日期区间汇总任务数和任务子项箱次，合计为全条件范围；FLOW-OVERVIEW / O | 显示人员分页与全条件合计 → 点数字或查看明细；与作业概览箱量分别理解。 |
-| F-028 查看人员理货明细 | 后台授权用户（具体岗位todo） | 电脑→[效率统计报表](/report/efficiency)→理货人员统计→数字/查看明细 | 按人员ID或未归属钻取已应用筛选范围，两列使用同一明细范围；FLOW-OVERVIEW / O | 明细分页显示 → 关闭结束；不改变理货数据。 |
+| 业务动作 | 发起角色/来源 | 操作地点 | 关键处理 | 关联数据库/表 | 生成/变更的数据 | 结果与下一步 |
+| --- | --- | --- | --- | --- | --- | --- |
+| F-001 查询理货任务 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→搜索/重置/刷新/分页 | 组合筛选并恢复已确认缓存，列表/角标同条件；按来源返回上次人员；FLOW-OVERVIEW / N | 读取 `tk_tally_task`；按来源关联 `ex_cargo_arrival`、`ex_cargo_arrival_item`、`ex_tally_record`、`ex_entrust_order`、`ex_inbound_record` 或进口来源表；客户/联系人展示关联见任务SQL | 理货业务表仅读取，无新增/变更；返回任务列表、角标及来源/最近人员等派生展示，筛选缓存在手机本地，不生成偏好表记录。 | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
+| F-001 查询理货任务 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→搜索/筛选/页签 | 组合筛选并恢复已确认缓存，列表/角标同条件；按来源返回上次人员；FLOW-OVERVIEW / N | 读取 `tk_tally_task`；按来源关联 `ex_cargo_arrival`、`ex_cargo_arrival_item`、`ex_tally_record`、`ex_entrust_order`、`ex_inbound_record` 或进口来源表；客户/联系人展示关联见任务SQL | 理货业务表仅读取，无新增/变更；返回任务列表、角标及来源/最近人员等派生展示，筛选缓存在手机本地，不生成偏好表记录。 | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
+| F-001 查询理货任务 | 手机旧路由进入者（系统登录） | 手机→旧装箱列表（应用内 `/pages/tally/loading/index`）→自动转任务列表 | 旧列表自动转统一任务查询，保留已定义路由筛选；FLOW-OVERVIEW / N | 读取 `tk_tally_task`；按来源关联 `ex_cargo_arrival`、`ex_cargo_arrival_item`、`ex_tally_record`、`ex_entrust_order`、`ex_inbound_record` 或进口来源表；客户/联系人展示关联见任务SQL | 理货业务表仅读取，无新增/变更；返回任务列表、角标及来源/最近人员等派生展示，筛选缓存在手机本地，不生成偏好表记录。 | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
+| F-001 查询理货任务 | 手机旧路由进入者（系统登录） | 手机→旧掏箱列表（应用内 `/pages/tally/unloading/index`）→自动转任务列表 | 旧列表自动转统一任务查询，保留已定义路由筛选；FLOW-OVERVIEW / N | 读取 `tk_tally_task`；按来源关联 `ex_cargo_arrival`、`ex_cargo_arrival_item`、`ex_tally_record`、`ex_entrust_order`、`ex_inbound_record` 或进口来源表；客户/联系人展示关联见任务SQL | 理货业务表仅读取，无新增/变更；返回任务列表、角标及来源/最近人员等派生展示，筛选缓存在手机本地，不生成偏好表记录。 | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
+| F-001 查询理货任务 | 手机旧到场登记入口使用者（首页入口todo） | 手机→旧到场登记详情→按箱进入理货（应用内 `/pages/tally/cargoArrival/detail?id={到场ID}`） | 带到场来源单号/作业类型/箱号/pending跳任务列表；不直接完成；FLOW-OVERVIEW / N | 读取 `tk_tally_task`；按来源关联 `ex_cargo_arrival`、`ex_cargo_arrival_item`、`ex_tally_record`、`ex_entrust_order`、`ex_inbound_record` 或进口来源表；客户/联系人展示关联见任务SQL | 理货业务表仅读取，无新增/变更；返回任务列表、角标及来源/最近人员等派生展示，筛选缓存在手机本地，不生成偏好表记录。 | 列表/角标更新 → 查看详情、创建独立任务或电脑勾选批量。 |
+| F-002 查看任务详情与理货单 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→详情 | 读取来源上下文、任务结果及理货要求；手机非到场详情只读；FLOW-OVERVIEW / N | 读取 `tk_tally_task`、`tk_tally_task_item`；按来源读取到场/委托/入货或进口来源记录及详情上下文 | 仅读取，无新增/变更；任务明细以 `tk_tally_task_item.taskId → tk_tally_task.id` 归属，详情响应不是新业务记录。 | 显示任务与来源 → 依类型进入到场或电脑通用完成；手机进口只读。 |
+| F-002 查看任务详情与理货单 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`） | 读取来源上下文、任务结果及理货要求；手机非到场详情只读；FLOW-OVERVIEW / N | 读取 `tk_tally_task`、`tk_tally_task_item`；按来源读取到场/委托/入货或进口来源记录及详情上下文 | 仅读取，无新增/变更；任务明细以 `tk_tally_task_item.taskId → tk_tally_task.id` 归属，详情响应不是新业务记录。 | 显示任务与来源 → 依类型进入到场或电脑通用完成；手机进口只读。 |
+| F-011 查询理货委托单 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部导航→委托单（应用内 `/pages/tally/entrustOrder/index`） | 按委托状态及单号/箱号筛选，委托状态与理货完成状态独立；FLOW-OVERVIEW / N | 读取 `ex_entrust_order`，按理货上下文关联 `ex_entrust_order_container`、`ex_tally_record` 及到场记录 | 仅读取，无新增/变更；返回委托列表和理货上下文摘要。 | 委托列表更新 → 查看理货上下文或卡片日志。 |
+| F-012 查看委托理货上下文 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`） | 汇总委托、最近箱记录及历史，不创建任务；FLOW-OVERVIEW / N | 读取 `ex_entrust_order`、`ex_entrust_order_container`、`ex_tally_record`，按记录归属关联 `ex_cargo_arrival` | 仅读取，无新增/变更；展示箱号、当前理货及提单状态，不因查看上下文创建理货任务。 | 上下文展示 → 按箱/提单更新，或独立完成提单、整单加固。 |
+| F-017 移除历史理货图片引用 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→委托理货表单→历史图片移除（应用内 `/pages/tally/entrustOrder/form`） | 按记录归属即时修改历史图片引用，不等待表单提交；FLOW-OVERVIEW / N | 读取、更新 `ex_tally_record`；必要时读取 `ex_cargo_arrival` 验证委托归属 | 按recordId从photoJson的CSV引用移除指定OSS ID；不新增记录、不删除sys_oss或OSS对象。最后一图赋null的实际清空受更新策略影响，未运行验证。 | 原记录图片引用即时变化 → 可继续表单；不删除OSS文件，最后引用持久化待验。 |
+| F-018 查询理货记录 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→查询 | 按记录或委托/到场范围只读查询；电脑到场单号筛选缺口仍存在；FLOW-OVERVIEW / N | 读取 `ex_tally_record`、`ex_tally_record_item`；按筛选及展示关联读取 `ex_cargo_arrival`、`ex_entrust_order` | 仅读取，无新增/变更；分页及入货单日志分组通过 `记录.arrivalId → 到场.inboundRecordId` 查询，不复制历史记录。 | 记录列表显示 → 查看详情、媒体或电脑删除/导出；手机详情限已加载范围。 |
+| F-018 查询理货记录 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→详情→理货记录页签 | 按记录或委托/到场范围只读查询；电脑到场单号筛选缺口仍存在；FLOW-OVERVIEW / N | 读取 `ex_tally_record`、`ex_tally_record_item`；按筛选及展示关联读取 `ex_cargo_arrival`、`ex_entrust_order` | 仅读取，无新增/变更；分页及入货单日志分组通过 `记录.arrivalId → 到场.inboundRecordId` 查询，不复制历史记录。 | 记录列表显示 → 查看详情、媒体或电脑删除/导出；手机详情限已加载范围。 |
+| F-018 查询理货记录 | 手机系统登录用户（首页“出口业务”入口，岗位授权todo） | 手机→首页出口业务→出口委托单→详情（应用内 `/pages/storage/export/entrust-order/detail?id={委托ID}`）→理货记录页签 | 按委托关联范围只取前100条展示，非手机理货日志过滤口径；FLOW-OVERVIEW / N | 读取 `ex_tally_record`、`ex_tally_record_item`；按筛选及展示关联读取 `ex_cargo_arrival`、`ex_entrust_order` | 仅读取，无新增/变更；分页及入货单日志分组通过 `记录.arrivalId → 到场.inboundRecordId` 查询，不复制历史记录。 | 记录列表显示 → 查看详情、媒体或电脑删除/导出；手机详情限已加载范围。 |
+| F-019 查看理货记录详情 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→详情 | 打开单条记录及媒体只读抽屉，不提供编辑保存；FLOW-OVERVIEW / N | 读取 `ex_tally_record`、`ex_tally_record_item`；按筛选及展示关联读取 `ex_cargo_arrival`、`ex_entrust_order` | 仅读取，无新增/变更；按记录id返回已有记录、核对子行和来源展示。 | 只读详情显示 → 关闭返回；业务数据不变。 |
+| F-020 删除理货记录 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→工具栏勾选删除/行内删除→确认 | 事务删除记录及核对行，只做部分状态回退，相关一致性见优化建议；FLOW-OVERVIEW / N | 逻辑删除 `ex_tally_record`、`ex_tally_record_item`；条件更新 `ex_cargo_arrival`、`ex_entrust_order_container`、`tk_container_profile`；读取所属父入货单检查可编辑 | 主记录及以tallyRecordId关联的核对子行按代码逻辑删除；无其余完成记录时到场回processing，无其余带状态记录时箱回not_required，不重算剩余记录最新状态。不回退任务/提单，不重同步绑定委托货物或删除OSS；同事务失败回滚。 | 删除后刷新 → 核对子行移除，任务/提单/绑定货物不会完整同步回退。 |
+| F-021 导出理货记录 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→导出 | 按当前查询条件导出，不按勾选集合；FLOW-OVERVIEW / N | 读取 `ex_tally_record`、`ex_tally_record_item`；按筛选及展示关联读取 `ex_cargo_arrival`、`ex_entrust_order` | 理货业务表仅读取，无新增/变更；生成Excel响应文件，文件不是新增数据库记录。框架操作审计不在此业务数据清单展开。 | 下载匹配记录Excel → 查看结束，不改变状态。 |
+| F-022 批量下载照片视频 | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→详情→理货记录→勾选→批量下载照片视频 | 按勾选记录打包媒体，空有效媒体拒绝；FLOW-OVERVIEW / N | 读取 `ex_tally_record`、原媒体的 `sys_oss`；成功打包新增一条 `sys_oss` | 不修改理货记录；按箱组织文件、上传新ZIP对象，并登记sys_oss的文件名/URL/服务/大小等，返回下载链接。手机按当前已加载记录范围发起，非H5也先请求打包再提示浏览器。OSS上传和元数据登记非同一数据库事务，失败残留未运行核验。 | 获得媒体ZIP链接 → 浏览器下载结束；手机范围/非H5限制见页面说明。 |
+| F-022 批量下载照片视频 | 手机系统登录用户（首页“出口业务”入口，岗位授权todo） | 手机→首页出口业务→出口委托单→详情（应用内 `/pages/storage/export/entrust-order/detail?id={委托ID}`）→理货记录→下载照片视频 | 仅已加载前100条中有媒体记录，H5打开链接，非H5提示浏览器下载；FLOW-OVERVIEW / N | 读取 `ex_tally_record`、原媒体的 `sys_oss`；成功打包新增一条 `sys_oss` | 不修改理货记录；按箱组织文件、上传新ZIP对象，并登记sys_oss的文件名/URL/服务/大小等，返回下载链接。手机按当前已加载记录范围发起，非H5也先请求打包再提示浏览器。OSS上传和元数据登记非同一数据库事务，失败残留未运行核验。 | 获得媒体ZIP链接 → 浏览器下载结束；手机范围/非H5限制见页面说明。 |
+| F-023 查看手机理货日志 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→任务卡片理货日志 | 优先整张入货单，其次委托，再本趟；过滤普通入库日志并连续读取过滤空满页；FLOW-OVERVIEW / N | 到场/委托日志读取 `ex_tally_record`、`ex_tally_record_item` 及 `ex_cargo_arrival` 等来源展示；其他来源读任务详情和 `tk_tally_task_item` | 仅读取，无新增/变更；有inboundRecordId优先按父入货单下全部到场筛日志，否则按委托/本趟，其他来源沿任务子项。切组、翻页和过滤不复制数据。 | 日志弹层显示 → 当前分组继续加载或关闭；隐藏入库日志不代表后台无记录。 |
+| F-023 查看手机理货日志 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货委托列表→卡片理货日志（应用内 `/pages/tally/entrustOrder/index`） | 按委托分页读取，隐藏普通入库记录，过滤空满页继续拉取；FLOW-OVERVIEW / N | 到场/委托日志读取 `ex_tally_record`、`ex_tally_record_item` 及 `ex_cargo_arrival` 等来源展示；其他来源读任务详情和 `tk_tally_task_item` | 仅读取，无新增/变更；有inboundRecordId优先按父入货单下全部到场筛日志，否则按委托/本趟，其他来源沿任务子项。切组、翻页和过滤不复制数据。 | 日志弹层显示 → 当前分组继续加载或关闭；隐藏入库日志不代表后台无记录。 |
+| F-025 从进口提货详情进入理货任务 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→进口提货详情→去理货任务（应用内 `/pages/tally/importPickup/detail?id={提货单ID}`） | 仅进行中提货带来源/类型/单号/pending条件转统一任务列表；FLOW-OVERVIEW / N | 此跳转动作无数据库交互；进入目标页后的读取见F-001 | 无新增/变更；拼接来源/类型/单号等应用内路由参数，手机进口任务详情仍只读。 | 进入筛选后的统一列表 → 查看任务；手机进口完成入口仍待明确。 |
+| F-027 查询理货人员统计 | 后台授权用户（具体岗位todo） | 电脑→[效率统计报表](/report/efficiency)→理货人员统计 | 按理货人及完成日期区间汇总任务数和任务子项箱次，合计为全条件范围；FLOW-OVERVIEW / N | 理货维度读取 `tk_tally_task`、`tk_tally_task_item`，通过 `sys_user` 关联人员名 | 仅读取，无新增/变更；按任务finishTime与completed状态派生任务数/箱次，不生成统计结果表，不把直接理货日志当任务子项。 | 显示人员分页与全条件合计 → 点数字或查看明细；与作业概览箱量分别理解。 |
+| F-028 查看人员理货明细 | 后台授权用户（具体岗位todo） | 电脑→[效率统计报表](/report/efficiency)→理货人员统计→数字/查看明细 | 按人员ID或未归属钻取已应用筛选范围，两列使用同一明细范围；FLOW-OVERVIEW / N | 理货维度读取 `tk_tally_task`、`tk_tally_task_item` 及 `sys_user` | 仅读取，无新增/变更；按已应用人员/日期范围分页返回任务/箱明细，页面钻取不生成新业务数据。 | 明细分页显示 → 关闭结束；不改变理货数据。 |
 
 ## 3. 页面与功能描述
 
@@ -373,8 +374,8 @@ flowchart TB
 | 更多→全部已加固 | 前端有委托edit；后端edit OR tally | 无前端箱候选过滤；后端跳过sealed/reinforced，全部跳过报错 | 可处理箱写已加固；刷新 |
 | 详情→理货记录（页签） | 先有委托query进入详情；日志接口另需record:list | 进入时读取orderId范围的直接记录 OR 所有关联到场记录 | 展示记录列表 |
 | 查询（箱号） | 理货记录页签打开 | 按箱号like且保留orderId | 刷新本页签第一页 |
-| 记录勾选／全选 | 有记录行 | 只选择本次下载集合 | 更新选中记录 |
-| 批量下载照片视频 | 至少选一条；前端未按export权限隐藏；后端需record:export | 按箱号分组；CSV空项、非数字ID略过；不按文件去重 | 加载打包后打开返回链接 |
+| 记录勾选／全选 | 有记录行 | 只选择本次下载集合 | 更新选中记录；成功打包会上传ZIP并新增附件元数据，不修改理货记录。 |
+| 批量下载照片视频 | 至少选一条；前端未按export权限隐藏；后端需record:export | 按箱号分组；CSV空项、非数字ID略过；不按文件去重 | 加载打包后打开返回链接；成功打包会上传ZIP并新增附件元数据，不修改理货记录。 |
 | 媒体预览／视频查看／分页 | 有附件或total>0 | 只读媒体控件；页码沿用委托与箱号过滤 | 查看媒体或加载页 |
 
 ### 3.15 出口委托详情理货记录（手机）
@@ -385,7 +386,7 @@ flowchart TB
 | --- | --- | --- | --- |
 | 理货记录（页签） | 已进入委托详情；接口另需record:list | 按orderId查直接记录及关联到场记录，page1/size100；无继续分页 | 显示只读件重尺、位置、人员与媒体 |
 | 理货照片／视频预览 | 对应记录有附件 | 复用ImageList/FileList只读展示 | 查看当前记录媒体，不改变理货 |
-| 下载照片视频 | 当前已加载记录至少一条有媒体；后端需record:export | 取当前前100条中有媒体记录ID，非按勾选；H5打开ZIP链接，其他端提示浏览器下载 | 下载已加载范围媒体；不保证整张委托全部历史 |
+| 下载照片视频 | 当前已加载记录至少一条有媒体；后端需record:export | 取当前前100条中有媒体记录ID，非按勾选；H5打开ZIP链接，其他端提示浏览器下载 | 下载已加载范围媒体；不保证整张委托全部历史；成功打包会上传ZIP并新增附件元数据，不修改理货记录。 |
 
 ### 3.16 进口出库理货详情（手机）
 
@@ -792,58 +793,58 @@ flowchart TB
 
 | 功能ID/业务动作 | 总览节点 | 发起角色/来源 | 页面入口 | 角色依据与边界 | 接口与服务链路 | 证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→出口业务→[货物到场登记](/export/cargo-arrival)→新增→保存 | 页面add按钮+Controller权限；具体岗位todo | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-098 E-099 E-117 E-024 |
-| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→进口重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→新增→选择安排掏箱→保存 | 来源add权限及表单inboundType，非手机端推断岗位 | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-100 E-101 E-025 E-106 |
-| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→作业任务 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/jobTask/index.vue)→重箱到场→保存 | 快捷按钮沿用重箱add权限、调用同源服务 | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-103 E-101 E-025 |
-| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→安排掏箱 | edit权限AND canArrangeUnload；来源接口二次锁校验 | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-100 E-102 E-106 |
-| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 来源服务兼容调用者（后台身份与权限需合法，正常yes页面未发现） | 自动触发代码 [代码入口](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/pickuporder/service/impl/ImPickupOrderServiceImpl.java)；电脑提货表单 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/pickupOrder/form.vue)固定no | 服务存在yes分支；前端禁用选择，不能称为正常可选页面 | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-026 E-104 E-105 E-107 |
-| F-001 查询理货任务 | FLOW-OVERVIEW / B | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→搜索/重置/刷新/分页 | list权限+菜单声明，岗位与运行菜单todo | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-001 E-004 E-006 |
-| F-001 查询理货任务 | FLOW-OVERVIEW / B | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→搜索/筛选/页签 | 首页理货员只是分组名称；实际list权限与角色绑定todo | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-007 E-095 E-004 |
-| F-001 查询理货任务 | FLOW-OVERVIEW / B | 手机旧路由进入者（系统登录） | 手机→旧装箱列表（应用内 `/pages/tally/loading/index`）→自动转任务列表 | 路由已注册且redirectTo；不把演示详情当真实业务 | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-049 E-007 E-036 |
-| F-001 查询理货任务 | FLOW-OVERVIEW / B | 手机旧路由进入者（系统登录） | 手机→旧掏箱列表（应用内 `/pages/tally/unloading/index`）→自动转任务列表 | 路由已注册且redirectTo；不把演示详情当真实业务 | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-050 E-007 E-036 |
-| F-001 查询理货任务 | FLOW-OVERVIEW / B | 手机旧到场登记入口使用者（首页入口todo） | 手机→旧到场登记详情→按箱进入理货（应用内 `/pages/tally/cargoArrival/detail?id={到场ID}`） | 页面已注册并实际navigateTo统一任务列表；可达首页菜单未发现 | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-115 E-114 E-036 |
-| F-002 查看任务详情与理货单 | FLOW-OVERVIEW / B | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→详情 | 已确认详情按钮/卡片及query接口；岗位todo | GET /storage/tracking/tally-task/{id} → queryById/loadSourceDetail | E-001 E-004 |
-| F-002 查看任务详情与理货单 | FLOW-OVERVIEW / B | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`） | 已确认详情按钮/卡片及query接口；岗位todo | GET /storage/tracking/tally-task/{id} → queryById/loadSourceDetail | E-008 E-095 E-004 |
-| F-003 创建箱号状态任务 | FLOW-OVERVIEW / A1 | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→箱号状态更新→创建确定 | add权限按钮 | POST /storage/tracking/tally-task → createTask | E-001 E-004 |
-| F-003 创建箱号状态任务 | FLOW-OVERVIEW / A1 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→新增→提交 | 手机按钮无局部权限隐藏，服务分别需add/complete | POST /storage/tracking/tally-task → createTask | E-007 E-004 E-095 |
-| F-004 完成通用理货任务 | FLOW-OVERVIEW / C | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→非到场完成任务→确定 | complete权限AND pending | POST /storage/tracking/tally-task/complete → completeTask → syncSourceAfterTaskCompleted | E-001 E-005 E-004 |
-| F-004 完成通用理货任务 | FLOW-OVERVIEW / C | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→新增箱状态→提交（创建后连续完成） | 正常手机可达通用完成为新增箱状态；其他通用表单分支仅技术兼容 | POST /storage/tracking/tally-task/complete → completeTask → syncSourceAfterTaskCompleted | E-007 E-005 |
-| F-005 追加到场理货记录 | FLOW-OVERVIEW / C | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→更新理货状态→表单（应用内 `/pages/tally/tallyRecord/form?taskId={任务ID}`） | 界面更新条件与普通记录add权限不完全一致，按页面/服务分别核对 | POST /storage/export/tallyRecord → insertByBo；每箱一个请求 | E-008 E-009 E-017 |
-| F-006 完成本趟到场理货 | FLOW-OVERVIEW / C | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→到场完成任务→确认/核对/位置 | complete权限+真实到场来源；配置或必要数据失败阻断 | POST /storage/tracking/tally-task/{id}/complete-arrival → completeArrival | E-001 E-069 E-070 E-071 E-004 |
-| F-006 完成本趟到场理货 | FLOW-OVERVIEW / C | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→完成到场登记理货 | complete权限；服务锁后拒绝完成/取消，手机配置失败降级仍是风险 | POST /storage/tracking/tally-task/{id}/complete-arrival → completeArrival | E-008 E-004 |
-| F-007 从任务完成提单入货 | FLOW-OVERVIEW / K | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→完成提单入货 | 手机完成权限；非纯入货路径；服务状态检查差异保留 | POST /storage/tracking/tally-task/{id}/complete-cargo → completeCargo | E-008 E-004 E-005 |
-| F-008 撤销任务提单完成 | FLOW-OVERVIEW / K | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→撤销提单理货完成 | 完成权限且标记1、非取消、直接委托 | POST /storage/tracking/tally-task/{id}/cancel-complete-cargo → cancelCompleteCargo | E-008 E-004 E-005 |
-| F-009 完成入货单理货 | FLOW-OVERVIEW / M | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→列表行→完成入货单理货 | 前后端入货edit OR 任务complete；真实岗位todo | POST /storage/export/inboundRecord/{id}/complete-tally → completeTally | E-096 E-046 E-019 |
-| F-009 完成入货单理货 | FLOW-OVERVIEW / M | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→详情抽屉→完成入货单理货 | 先需query进入详情；完成另需edit OR complete | POST /storage/export/inboundRecord/{id}/complete-tally → completeTally | E-097 E-046 E-019 |
-| F-009 完成入货单理货 | FLOW-OVERVIEW / M | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→纯入货路径→完成入货单理货 | 系统用户；入货edit OR任务complete（含超级权限） | POST /storage/export/inboundRecord/{id}/complete-tally → completeTally | E-008 E-046 E-019 |
-| F-010 撤销入货单理货完成 | FLOW-OVERVIEW / M | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→列表行→撤销理货完成 | 前后端入货edit OR 任务complete；真实岗位todo | POST /storage/export/inboundRecord/{id}/reopen-tally → reopenTally | E-096 E-046 E-019 |
-| F-010 撤销入货单理货完成 | FLOW-OVERVIEW / M | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→详情抽屉→撤销理货完成 | 先需query进入详情；完成另需edit OR complete | POST /storage/export/inboundRecord/{id}/reopen-tally → reopenTally | E-097 E-046 E-019 |
-| F-010 撤销入货单理货完成 | FLOW-OVERVIEW / M | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→纯入货路径→撤销理货完成 | 系统用户；入货edit OR任务complete（含超级权限） | POST /storage/export/inboundRecord/{id}/reopen-tally → reopenTally | E-008 E-046 E-019 |
-| F-011 查询理货委托单 | FLOW-OVERVIEW / G | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部导航→委托单（应用内 `/pages/tally/entrustOrder/index`） | 底部真实路由；委托list接口权限 | GET /storage/export/entrust/list；共享委托列表接口 | E-010 E-039 E-095 |
-| F-012 查看委托理货上下文 | FLOW-OVERVIEW / G | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`） | 上下文tally权限；不是司机身份 | GET /storage/export/entrust/{id}/tally-context → queryContext | E-011 E-013 |
-| F-013 提交委托单理货 | FLOW-OVERVIEW / H | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→按箱/按提单→表单（应用内 `/pages/tally/entrustOrder/form?orderId={委托ID}`）→提交 | tally权限；当前入口不以提单完成状态统一隐藏 | POST /storage/export/entrust/{id}/tally-records → submit → insertByBo | E-011 E-012 E-013 E-014 |
-| F-014 从委托完成提单入货 | FLOW-OVERVIEW / K | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→完成理货 | edit OR tally权限及receiveStatus条件 | POST /storage/export/entrust/{id}/complete-cargo → completeCargo | E-022 E-013 E-014 |
-| F-014 从委托完成提单入货 | FLOW-OVERVIEW / K | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→完成提单入货 | 本地状态入口，服务edit OR tally权限 | POST /storage/export/entrust/{id}/complete-cargo → completeCargo | E-011 E-013 E-014 |
-| F-015 从委托取消理货完成 | FLOW-OVERVIEW / K | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→取消理货 | edit OR tally权限且receiveStatus=completed | POST /storage/export/entrust/{id}/cancel-complete-cargo → cancelCompleteCargo | E-022 E-013 E-014 |
-| F-016 本单装箱完成或全部已加固 | FLOW-OVERVIEW / H | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→全部已加固 | 前端edit，后端edit OR tally；无前端候选箱统一限制 | POST /storage/export/entrust/{id}/complete-loading → completeLoading | E-022 E-013 E-014 |
-| F-016 本单装箱完成或全部已加固 | FLOW-OVERVIEW / H | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→本单装箱完成 | 本地至少一可处理箱；服务edit OR tally | POST /storage/export/entrust/{id}/complete-loading → completeLoading | E-011 E-013 E-014 |
-| F-017 移除历史理货图片引用 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→委托理货表单→历史图片移除（应用内 `/pages/tally/entrustOrder/form`） | tally权限与委托记录归属校验 | DELETE /storage/export/entrust/{id}/tally-records/{recordId}/photos/{ossId} → removeOrderTallyPhoto | E-012 E-014 E-045 |
-| F-018 查询理货记录 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→查询 | record:list权限 | GET /storage/export/tallyRecord/list → buildQueryWrapper | E-015 E-017 E-018 |
-| F-018 查询理货记录 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→详情→理货记录页签 | 先委托query，记录另需record:list | GET /storage/export/tallyRecord/list → buildQueryWrapper | E-023 E-017 |
-| F-018 查询理货记录 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“出口业务”入口，岗位授权todo） | 手机→首页出口业务→出口委托单→详情（应用内 `/pages/storage/export/entrust-order/detail?id={委托ID}`）→理货记录页签 | 首页出口业务分组；记录list接口权限，局部无角色绑定 | GET /storage/export/tallyRecord/list → buildQueryWrapper | E-108 E-095 E-017 |
-| F-019 查看理货记录详情 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→详情 | record:query权限，show-submit=false | GET /storage/export/tallyRecord/{id} → queryById | E-015 E-016 E-017 |
-| F-020 删除理货记录 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→工具栏勾选删除/行内删除→确认 | record:remove权限；父入货完成时阻断 | DELETE /storage/export/tallyRecord/{ids} → deleteWithValidByIds | E-015 E-017 E-018 |
-| F-021 导出理货记录 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→导出 | record:export权限 | POST /storage/export/tallyRecord/export → queryList/ExcelUtil | E-015 E-017 |
-| F-022 批量下载照片视频 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→详情→理货记录→勾选→批量下载照片视频 | 前端仅检查勾选，后端record:export；实际角色todo | POST /storage/export/tallyRecord/download-zip → ISysOssService.downloadZip | E-023 E-017 |
-| F-022 批量下载照片视频 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“出口业务”入口，岗位授权todo） | 手机→首页出口业务→出口委托单→详情（应用内 `/pages/storage/export/entrust-order/detail?id={委托ID}`）→理货记录→下载照片视频 | 无局部export隐藏；后端需export | POST /storage/export/tallyRecord/download-zip → ISysOssService.downloadZip | E-108 E-017 E-095 |
-| F-023 查看手机理货日志 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→任务卡片理货日志 | 任务detail及记录接口权限分别生效；客户端无额外角色推断 | tallyRecord/list?inboundRecordId 或委托tallyRecords/本趟arrivalId；其他来源task detail.items；20条分页，过滤空满页继续拉取 | E-007 E-018 |
-| F-023 查看手机理货日志 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货委托列表→卡片理货日志（应用内 `/pages/tally/entrustOrder/index`） | 委托日志tally接口；与任务卡片入货优先范围区别 | tallyRecord/list?inboundRecordId 或委托tallyRecords/本趟arrivalId；其他来源task detail.items；20条分页，过滤空满页继续拉取 | E-010 E-013 |
-| F-025 从进口提货详情进入理货任务 | FLOW-OVERVIEW / B | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→进口提货详情→去理货任务（应用内 `/pages/tally/importPickup/detail?id={提货单ID}`） | 页面已注册，按钮状态in_progress；正常首页独立菜单todo | pickupStatus=in_progress → navigateTo task list；非写入 | E-027 E-008 E-036 |
-| F-026 批量完成理货 | FLOW-OVERVIEW / C | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→勾选当前页→批量完成理货 | 沿用complete权限，非pending不能勾选 | POST /storage/tracking/tally-task/batch-complete → batchCompleteTask → completeArrival 或 completeTask | E-001 E-004 E-005 E-063 E-075 |
-| F-027 查询理货人员统计 | FLOW-OVERVIEW / O | 后台授权用户（具体岗位todo） | 电脑→[效率统计报表](/report/efficiency)→理货人员统计 | report:efficiency:list；工作区未提交实现、实际菜单部署todo | GET /report/efficiency/personnel-list 与 /personnel-summary → queryPersonnelList/queryPersonnelSummary → EfficiencyPersonnelMapper | E-040 E-077 E-078 E-080 |
-| F-028 查看人员理货明细 | FLOW-OVERVIEW / O | 后台授权用户（具体岗位todo） | 电脑→[效率统计报表](/report/efficiency)→理货人员统计→数字/查看明细 | 同report:list，数值0禁用但行内查看仅加载限制 | GET /report/efficiency/personnel-detail-list → queryPersonnelDetails → EfficiencyPersonnelMapper.selectDetails | E-077 E-078 E-079 E-080 |
-| F-029 来源收尾取消待处理理货任务 | FLOW-OVERVIEW / B1 | 后台来源操作触发的系统动作（岗位todo） | 电脑→提货单 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/pickupOrder/index.vue)→提货完成→确认完成 | 提货edit权限；前端进行中/理货完成，服务拒绝重复completed | ImPickupOrderServiceImpl.completePickup→cancelPendingTallyTasks；ImHeavyEntryLifecycleServiceImpl.delete→restoreAndDelete | E-104 E-026 E-107 |
-| F-029 来源收尾取消待处理理货任务 | FLOW-OVERVIEW / B1 | 后台来源操作触发的系统动作（岗位todo） | 电脑→重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→删除→原因/检查→确认 | remove权限；关联作业/位置回滚检查，已有理货阻断 | ImPickupOrderServiceImpl.completePickup→cancelPendingTallyTasks；ImHeavyEntryLifecycleServiceImpl.delete→restoreAndDelete | E-100 E-102 E-106 |
+| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→出口业务→[货物到场登记](/export/cargo-arrival)→新增→保存 | 页面add按钮+Controller权限；具体岗位todo | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-005 E-024 E-059 E-098 E-099 E-117 E-119 E-120 |
+| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→进口重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→新增→选择安排掏箱→保存 | 来源add权限及表单inboundType，非手机端推断岗位 | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-005 E-025 E-059 E-100 E-101 E-103 E-106 E-128 E-133 |
+| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→作业任务 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/jobTask/index.vue)→重箱到场→保存 | 快捷按钮沿用重箱add权限、调用同源服务 | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-005 E-025 E-059 E-101 E-103 E-128 E-133 |
+| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→安排掏箱 | edit权限AND canArrangeUnload；来源接口二次锁校验 | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-005 E-059 E-100 E-102 E-106 E-126 E-128 |
+| F-024 来源业务生成理货任务 | FLOW-OVERVIEW / A | 来源服务兼容调用者（后台身份与权限需合法，正常yes页面未发现） | 自动触发代码 [代码入口](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/pickuporder/service/impl/ImPickupOrderServiceImpl.java)；电脑提货表单 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/pickupOrder/form.vue)固定no | 服务存在yes分支；前端禁用选择，不能称为正常可选页面 | 货物到场insert→createInitialTallyRecord；重箱insert/arrangeUnload→createTask；提货insert在needTally=yes时→createTask | E-026 E-059 E-104 E-105 E-107 E-129 E-130 |
+| F-001 查询理货任务 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→搜索/重置/刷新/分页 | list权限+菜单声明，岗位与运行菜单todo | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-001 E-004 E-005 E-006 E-007 E-059 E-061 E-119 E-120 E-121 E-124 |
+| F-001 查询理货任务 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→搜索/筛选/页签 | 首页理货员只是分组名称；实际list权限与角色绑定todo | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-004 E-005 E-006 E-007 E-059 E-061 E-095 E-119 E-120 E-121 E-124 |
+| F-001 查询理货任务 | FLOW-OVERVIEW / N | 手机旧路由进入者（系统登录） | 手机→旧装箱列表（应用内 `/pages/tally/loading/index`）→自动转任务列表 | 路由已注册且redirectTo；不把演示详情当真实业务 | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-005 E-006 E-007 E-036 E-049 E-059 E-061 E-119 E-120 E-121 E-124 |
+| F-001 查询理货任务 | FLOW-OVERVIEW / N | 手机旧路由进入者（系统登录） | 手机→旧掏箱列表（应用内 `/pages/tally/unloading/index`）→自动转任务列表 | 路由已注册且redirectTo；不把演示详情当真实业务 | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-005 E-006 E-007 E-036 E-050 E-059 E-061 E-119 E-120 E-121 E-124 |
+| F-001 查询理货任务 | FLOW-OVERVIEW / N | 手机旧到场登记入口使用者（首页入口todo） | 手机→旧到场登记详情→按箱进入理货（应用内 `/pages/tally/cargoArrival/detail?id={到场ID}`） | 页面已注册并实际navigateTo统一任务列表；可达首页菜单未发现 | GET /storage/tracking/tally-task/list → queryPageList → selectTaskPage | E-005 E-006 E-007 E-036 E-059 E-061 E-114 E-115 E-119 E-120 E-121 E-124 |
+| F-002 查看任务详情与理货单 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→详情 | 已确认详情按钮/卡片及query接口；岗位todo | GET /storage/tracking/tally-task/{id} → queryById/loadSourceDetail | E-001 E-004 E-005 E-006 E-059 E-060 E-061 E-119 E-120 E-121 E-124 |
+| F-002 查看任务详情与理货单 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`） | 已确认详情按钮/卡片及query接口；岗位todo | GET /storage/tracking/tally-task/{id} → queryById/loadSourceDetail | E-004 E-005 E-006 E-008 E-059 E-060 E-061 E-095 E-119 E-120 E-121 E-124 |
+| F-003 创建箱号状态任务 | FLOW-OVERVIEW / A | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→箱号状态更新→创建确定 | add权限按钮 | POST /storage/tracking/tally-task → createTask | E-001 E-004 E-005 E-007 E-059 E-126 |
+| F-003 创建箱号状态任务 | FLOW-OVERVIEW / A | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→新增→提交 | 手机按钮无局部权限隐藏，服务分别需add/complete | POST /storage/tracking/tally-task → createTask | E-004 E-005 E-007 E-059 E-095 E-126 |
+| F-004 完成通用理货任务 | FLOW-OVERVIEW / B | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→非到场完成任务→确定 | complete权限AND pending | POST /storage/tracking/tally-task/complete → completeTask → syncSourceAfterTaskCompleted | E-001 E-004 E-005 E-018 E-059 E-060 E-061 E-126 E-127 E-128 E-129 E-130 |
+| F-004 完成通用理货任务 | FLOW-OVERVIEW / B | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→新增箱状态→提交（创建后连续完成） | 正常手机可达通用完成为新增箱状态；其他通用表单分支仅技术兼容 | POST /storage/tracking/tally-task/complete → completeTask → syncSourceAfterTaskCompleted | E-005 E-007 E-059 E-060 E-126 E-127 |
+| F-005 追加到场理货记录 | FLOW-OVERVIEW / A1 | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→更新理货状态→表单（应用内 `/pages/tally/tallyRecord/form?taskId={任务ID}`） | 界面更新条件与普通记录add权限不完全一致，按页面/服务分别核对 | POST /storage/export/tallyRecord → insertByBo；每箱一个请求 | E-008 E-009 E-017 E-018 E-021 E-061 E-118 E-119 E-122 E-124 E-126 |
+| F-006 完成本趟到场理货 | FLOW-OVERVIEW / B | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→到场完成任务→确认/核对/位置 | complete权限+真实到场来源；配置或必要数据失败阻断 | POST /storage/tracking/tally-task/{id}/complete-arrival → completeArrival | E-001 E-004 E-005 E-018 E-019 E-021 E-059 E-061 E-069 E-070 E-071 E-118 E-119 E-123 E-125 E-131 |
+| F-006 完成本趟到场理货 | FLOW-OVERVIEW / B | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→完成到场登记理货 | complete权限；服务锁后拒绝完成/取消，手机配置失败降级仍是风险 | POST /storage/tracking/tally-task/{id}/complete-arrival → completeArrival | E-004 E-005 E-008 E-018 E-019 E-021 E-059 E-061 E-118 E-119 E-123 E-125 E-131 |
+| F-007 从任务完成提单入货 | FLOW-OVERVIEW / F | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→完成提单入货 | 手机完成权限；非纯入货路径；服务状态检查差异保留 | POST /storage/tracking/tally-task/{id}/complete-cargo → completeCargo | E-004 E-005 E-008 E-018 E-019 E-059 E-061 E-119 E-121 E-124 E-131 |
+| F-008 撤销任务提单完成 | FLOW-OVERVIEW / F | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→撤销提单理货完成 | 完成权限且标记1、非取消、直接委托 | POST /storage/tracking/tally-task/{id}/cancel-complete-cargo → cancelCompleteCargo | E-004 E-005 E-008 E-059 E-119 E-121 |
+| F-009 完成入货单理货 | FLOW-OVERVIEW / H | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→列表行→完成入货单理货 | 前后端入货edit OR 任务complete；真实岗位todo | POST /storage/export/inboundRecord/{id}/complete-tally → completeTally | E-019 E-021 E-046 E-096 E-119 E-124 |
+| F-009 完成入货单理货 | FLOW-OVERVIEW / H | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→详情抽屉→完成入货单理货 | 先需query进入详情；完成另需edit OR complete | POST /storage/export/inboundRecord/{id}/complete-tally → completeTally | E-019 E-021 E-046 E-097 E-119 E-124 |
+| F-009 完成入货单理货 | FLOW-OVERVIEW / H | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→纯入货路径→完成入货单理货 | 系统用户；入货edit OR任务complete（含超级权限） | POST /storage/export/inboundRecord/{id}/complete-tally → completeTally | E-008 E-019 E-021 E-046 E-119 E-124 |
+| F-010 撤销入货单理货完成 | FLOW-OVERVIEW / H | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→列表行→撤销理货完成 | 前后端入货edit OR 任务complete；真实岗位todo | POST /storage/export/inboundRecord/{id}/reopen-tally → reopenTally | E-019 E-021 E-046 E-096 E-124 |
+| F-010 撤销入货单理货完成 | FLOW-OVERVIEW / H | 后台授权用户（具体岗位todo） | 电脑→出口业务→[入货单](/export/inbound-record)→详情抽屉→撤销理货完成 | 先需query进入详情；完成另需edit OR complete | POST /storage/export/inboundRecord/{id}/reopen-tally → reopenTally | E-019 E-021 E-046 E-097 E-124 |
+| F-010 撤销入货单理货完成 | FLOW-OVERVIEW / H | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货任务卡片→详情（应用内 `/pages/tally/tallyTask/detail?taskId={任务ID}`）→纯入货路径→撤销理货完成 | 系统用户；入货edit OR任务complete（含超级权限） | POST /storage/export/inboundRecord/{id}/reopen-tally → reopenTally | E-008 E-019 E-021 E-046 E-124 |
+| F-011 查询理货委托单 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部导航→委托单（应用内 `/pages/tally/entrustOrder/index`） | 底部真实路由；委托list接口权限 | GET /storage/export/entrust/list；共享委托列表接口 | E-010 E-014 E-039 E-061 E-095 E-119 E-121 E-122 |
+| F-012 查看委托理货上下文 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`） | 上下文tally权限；不是司机身份 | GET /storage/export/entrust/{id}/tally-context → queryContext | E-011 E-013 E-014 E-018 E-061 E-119 E-121 E-122 |
+| F-013 提交委托单理货 | FLOW-OVERVIEW / D | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→按箱/按提单→表单（应用内 `/pages/tally/entrustOrder/form?orderId={委托ID}`）→提交 | tally权限；当前入口不以提单完成状态统一隐藏 | POST /storage/export/entrust/{id}/tally-records → submit → insertByBo | E-011 E-012 E-013 E-014 E-018 E-061 E-121 E-122 E-126 |
+| F-014 从委托完成提单入货 | FLOW-OVERVIEW / F | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→完成理货 | edit OR tally权限及receiveStatus条件 | POST /storage/export/entrust/{id}/complete-cargo → completeCargo | E-013 E-014 E-018 E-019 E-022 E-061 E-121 E-124 E-131 |
+| F-014 从委托完成提单入货 | FLOW-OVERVIEW / F | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→完成提单入货 | 本地状态入口，服务edit OR tally权限 | POST /storage/export/entrust/{id}/complete-cargo → completeCargo | E-011 E-013 E-014 E-018 E-019 E-061 E-121 E-124 E-131 |
+| F-015 从委托取消理货完成 | FLOW-OVERVIEW / F | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→取消理货 | edit OR tally权限且receiveStatus=completed | POST /storage/export/entrust/{id}/cancel-complete-cargo → cancelCompleteCargo | E-013 E-014 E-022 E-121 |
+| F-016 本单装箱完成或全部已加固 | FLOW-OVERVIEW / D | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→更多→全部已加固 | 前端edit，后端edit OR tally；无前端候选箱统一限制 | POST /storage/export/entrust/{id}/complete-loading → completeLoading | E-013 E-014 E-018 E-022 E-061 E-121 E-122 E-126 |
+| F-016 本单装箱完成或全部已加固 | FLOW-OVERVIEW / D | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货底部委托单→详情（应用内 `/pages/tally/entrustOrder/detail?id={委托ID}`）→本单装箱完成 | 本地至少一可处理箱；服务edit OR tally | POST /storage/export/entrust/{id}/complete-loading → completeLoading | E-011 E-013 E-014 E-018 E-061 E-121 E-122 E-126 |
+| F-017 移除历史理货图片引用 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→委托理货表单→历史图片移除（应用内 `/pages/tally/entrustOrder/form`） | tally权限与委托记录归属校验 | DELETE /storage/export/entrust/{id}/tally-records/{recordId}/photos/{ossId} → removeOrderTallyPhoto | E-012 E-014 E-018 E-045 E-061 E-111 E-119 |
+| F-018 查询理货记录 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→查询 | record:list权限 | GET /storage/export/tallyRecord/list → buildQueryWrapper | E-015 E-017 E-018 E-061 E-118 E-119 E-121 |
+| F-018 查询理货记录 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→详情→理货记录页签 | 先委托query，记录另需record:list | GET /storage/export/tallyRecord/list → buildQueryWrapper | E-017 E-018 E-023 E-061 E-118 E-119 E-121 |
+| F-018 查询理货记录 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“出口业务”入口，岗位授权todo） | 手机→首页出口业务→出口委托单→详情（应用内 `/pages/storage/export/entrust-order/detail?id={委托ID}`）→理货记录页签 | 首页出口业务分组；记录list接口权限，局部无角色绑定 | GET /storage/export/tallyRecord/list → buildQueryWrapper | E-017 E-018 E-061 E-095 E-108 E-118 E-119 E-121 |
+| F-019 查看理货记录详情 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→详情 | record:query权限，show-submit=false | GET /storage/export/tallyRecord/{id} → queryById | E-015 E-016 E-017 E-018 E-061 E-118 E-119 E-121 |
+| F-020 删除理货记录 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→工具栏勾选删除/行内删除→确认 | record:remove权限；父入货完成时阻断 | DELETE /storage/export/tallyRecord/{ids} → deleteWithValidByIds | E-015 E-017 E-018 E-021 E-061 E-118 E-119 E-122 E-124 E-126 |
+| F-021 导出理货记录 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[理货记录](/export/tally-record)→导出 | record:export权限 | POST /storage/export/tallyRecord/export → queryList/ExcelUtil | E-015 E-017 E-018 E-061 E-118 E-119 E-121 |
+| F-022 批量下载照片视频 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→出口业务→[出口委托单](/export/entrust-order)→详情→理货记录→勾选→批量下载照片视频 | 前端仅检查勾选，后端record:export；实际角色todo | POST /storage/export/tallyRecord/download-zip → ISysOssService.downloadZip | E-017 E-023 E-061 E-108 E-135 E-136 |
+| F-022 批量下载照片视频 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“出口业务”入口，岗位授权todo） | 手机→首页出口业务→出口委托单→详情（应用内 `/pages/storage/export/entrust-order/detail?id={委托ID}`）→理货记录→下载照片视频 | 无局部export隐藏；后端需export | POST /storage/export/tallyRecord/download-zip → ISysOssService.downloadZip | E-017 E-061 E-095 E-108 E-135 E-136 |
+| F-023 查看手机理货日志 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→首页理货员分组→理货任务（应用内 `/pages/tally/tallyTask/index`）→任务卡片理货日志 | 任务detail及记录接口权限分别生效；客户端无额外角色推断 | tallyRecord/list?inboundRecordId 或委托tallyRecords/本趟arrivalId；其他来源task detail.items；20条分页，过滤空满页继续拉取 | E-005 E-007 E-018 E-060 E-061 E-086 E-118 E-119 E-121 |
+| F-023 查看手机理货日志 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→理货委托列表→卡片理货日志（应用内 `/pages/tally/entrustOrder/index`） | 委托日志tally接口；与任务卡片入货优先范围区别 | tallyRecord/list?inboundRecordId 或委托tallyRecords/本趟arrivalId；其他来源task detail.items；20条分页，过滤空满页继续拉取 | E-005 E-007 E-010 E-013 E-018 E-060 E-061 E-086 E-118 E-119 E-121 |
+| F-025 从进口提货详情进入理货任务 | FLOW-OVERVIEW / N | 手机系统登录用户（首页“理货员”入口分组，岗位授权todo） | 手机→进口提货详情→去理货任务（应用内 `/pages/tally/importPickup/detail?id={提货单ID}`） | 页面已注册，按钮状态in_progress；正常首页独立菜单todo | pickupStatus=in_progress → navigateTo task list；非写入 | E-008 E-027 E-036 |
+| F-026 批量完成理货 | FLOW-OVERVIEW / B | 后台授权用户（具体岗位todo） | 电脑→过程跟踪→理货任务中心 [代码入口](../../../../storage/web/plus-ui/src/views/storage/tracking/tallyTask/index.vue)→勾选当前页→批量完成理货 | 沿用complete权限，非pending不能勾选 | POST /storage/tracking/tally-task/batch-complete → batchCompleteTask → completeArrival 或 completeTask | E-001 E-004 E-005 E-018 E-019 E-059 E-060 E-061 E-063 E-075 E-118 E-119 E-123 |
+| F-027 查询理货人员统计 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→[效率统计报表](/report/efficiency)→理货人员统计 | report:efficiency:list；工作区未提交实现、实际菜单部署todo | GET /report/efficiency/personnel-list 与 /personnel-summary → queryPersonnelList/queryPersonnelSummary → EfficiencyPersonnelMapper | E-028 E-040 E-059 E-060 E-077 E-078 E-080 |
+| F-028 查看人员理货明细 | FLOW-OVERVIEW / N | 后台授权用户（具体岗位todo） | 电脑→[效率统计报表](/report/efficiency)→理货人员统计→数字/查看明细 | 同report:list，数值0禁用但行内查看仅加载限制 | GET /report/efficiency/personnel-detail-list → queryPersonnelDetails → EfficiencyPersonnelMapper.selectDetails | E-028 E-059 E-060 E-077 E-078 E-079 E-080 |
+| F-029 来源收尾取消待处理理货任务 | FLOW-OVERVIEW / B1 | 后台来源操作触发的系统动作（岗位todo） | 电脑→提货单 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/pickupOrder/index.vue)→提货完成→确认完成 | 提货edit权限；前端进行中/理货完成，服务拒绝重复completed | ImPickupOrderServiceImpl.completePickup→cancelPendingTallyTasks；ImHeavyEntryLifecycleServiceImpl.delete→restoreAndDelete | E-026 E-059 E-104 E-107 E-129 E-130 E-132 |
+| F-029 来源收尾取消待处理理货任务 | FLOW-OVERVIEW / B1 | 后台来源操作触发的系统动作（岗位todo） | 电脑→重箱到场 [代码入口](../../../../storage/web/plus-ui/src/views/storage/impot/heavyEntry/index.vue)→删除→原因/检查→确认 | remove权限；关联作业/位置回滚检查，已有理货阻断 | ImPickupOrderServiceImpl.completePickup→cancelPendingTallyTasks；ImHeavyEntryLifecycleServiceImpl.delete→restoreAndDelete | E-059 E-100 E-102 E-106 E-126 E-127 E-128 E-132 E-133 E-134 E-137 E-138 |
 
 ### 9.2 字段映射
 
@@ -1214,3 +1215,24 @@ flowchart TB
 | E-115 | [旧到场详情按箱转任务列表及上传入货单图片入口](../../../../storage/web/plus-mobile/src/pages/tally/cargoArrival/detail.vue) | a2e4cfc8e6a69d245bae48981fa6ea159c04c029540cd21cbc0f2654646e17b6 |
 | E-116 | [旧手机上传入货单图片，归到场模块关联出口](../../../../storage/web/plus-mobile/src/pages/tally/cargoArrival/inboundDoc.vue) | 847727e3dddac6d970c9f7aecaf36e6aa1cc2e35ba4118002d0189b8bc86a48d |
 | E-117 | [到场新增与专用入货图片接口、权限与服务衔接](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/cargoarrival/controller/ExportCargoArrivalController.java) | b1ddbe1c5ac924357764e6f9a8f788299e1d4cacf9780fd1126b06b99976ed92 |
+| E-118 | [ExportTallyRecordItem @TableName ex_tally_record_item](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/tallyrecord/domain/ExportTallyRecordItem.java) | a3e6142269bdae362fdfd9d8ac7f2dfe70a5d61792e826b9f7850be741b78d3e |
+| E-119 | [ExportCargoArrival @TableName ex_cargo_arrival](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/cargoarrival/domain/ExportCargoArrival.java) | 3352e5045c63f3d8b50d604de4ff25d91b002b57442704fb3d8dcbdc55dd17d0 |
+| E-120 | [ExportCargoArrivalItem @TableName ex_cargo_arrival_item](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/cargoarrival/domain/ExportCargoArrivalItem.java) | c0b46129dd8e7f0a821d0796d9d951d46a00766f9624829320036ebea1c9a48e |
+| E-121 | [ExportEntrustOrder @TableName ex_entrust_order](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/entrust/domain/ExportEntrustOrder.java) | 01b2eb641e4a8f6e8c3aa8106a31738e5ac100739598f44555ba9fcba95a9c78 |
+| E-122 | [ExportEntrustOrderContainer @TableName ex_entrust_order_container](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/entrust/domain/ExportEntrustOrderContainer.java) | 06e126c4811ab06b2dbe588d0a705d9c5335193deffdaeae426b866ea0614575 |
+| E-123 | [ExportEntrustOrderCargoItem @TableName ex_entrust_order_cargo_item](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/entrust/domain/ExportEntrustOrderCargoItem.java) | 42d46623e716aedcc060689656d43ad3e3bfa177d1c2db31e119f3cfe17c113b |
+| E-124 | [ExportInboundRecord @TableName ex_inbound_record](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/inboundrecord/domain/ExportInboundRecord.java) | f6455de6993ea104469f4eae7a948b8e75c3bfbaf80786b14e66f70e8ed1395b |
+| E-125 | [ExportInboundRecordItem @TableName ex_inbound_record_item](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/inboundrecord/domain/ExportInboundRecordItem.java) | 918f64566d80d3774c077af7ea04633d29dc89e7b2291db22a1dff31eeb1f581 |
+| E-126 | [ContainerProfile @TableName tk_container_profile](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/tracking/domain/ContainerProfile.java) | 14b663298347332b1d64d4a269ef661fec5f1c314ad537050fca1166f43e6743 |
+| E-127 | [ContainerTimeline @TableName tk_container_timeline](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/tracking/domain/ContainerTimeline.java) | cd7fd9da84d49d4cb877ab99d536cdc09c44e9ee541979f755de43a89c360511 |
+| E-128 | [ImHeavyEntry @TableName im_heavy_entry](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/heavyentry/domain/ImHeavyEntry.java) | 84828d072f0a5d1c1d9387afb8ba432f55f941d6f4e81edcada80fbc90b2d7a9 |
+| E-129 | [ImPickupOrder @TableName im_pickup_order](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/pickuporder/domain/ImPickupOrder.java) | 24f8eacbd2d58621177d1c577cc0be68125821fcab3ad5e1e6ec0f92f6a19e45 |
+| E-130 | [ImPickupOrderItem @TableName im_pickup_order_item](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/pickuporder/domain/ImPickupOrderItem.java) | 2eb1e4453ab0e872d451acd0f79cdf67cb9cd74bf7c347dac3d3c4d6a8a6a49c |
+| E-131 | [ExportEntrustInboundRel @TableName ex_entrust_inbound_rel](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/export/inboundrecord/domain/ExportEntrustInboundRel.java) | 5f46e01b4052aa102d68447f67f0b4114c962bd413f2f0364970916e2c2b25ec |
+| E-132 | [ImEntrustOrderContainer @TableName im_entrust_order_container](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/entrust/domain/ImEntrustOrderContainer.java) | fbfd2b9de5016d12704c6e7a21dc6a765975c066c0a126fb630f3df4eb4eca54 |
+| E-133 | [JobTask @TableName tk_job_task](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/tracking/jobtask/domain/JobTask.java) | 4dcfe595ced359097930affe74e9e99b749bde523c2c8a016bc0699d90323725 |
+| E-134 | [StorageLocation @TableName st_storage_location](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/base/storagelocation/domain/StorageLocation.java) | ae8ce8660f5b2c3651362dce6671865570038ea5a92bac2d094fef9197488e14 |
+| E-135 | [SysOss @TableName sys_oss](../../../../storage/web/ruoyi-modules/ruoyi-system/src/main/java/org/dromara/system/domain/SysOss.java) | 42f2dee1bdd97fbe2ae212f3b6555ded0e26c3c854c265f1b58d02a370d6e825 |
+| E-136 | [SysOssServiceImpl.downloadZip/buildResultEntity](../../../../storage/web/ruoyi-modules/ruoyi-system/src/main/java/org/dromara/system/service/impl/SysOssServiceImpl.java) | 33c2ee619dc887c53d6e5ec6717b3ea887a4bd81da88b67fd25ed9929f8cf9ab |
+| E-137 | [LocationOccupyService.release](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/tracking/jobtask/support/LocationOccupyService.java) | 4a5f72e2d7850059cf879864f6d9dd10ac84864199faf5cc5a8f8257a7b0b9f7 |
+| E-138 | [ImportEntrySupport.refreshArrivalStatus 重算委托箱到场状态](../../../../storage/web/ruoyi-modules/st-storage/src/main/java/com/i4h2/storage/impot/heavyentry/support/ImportEntrySupport.java) | 277983d2b0976d5bd38cbd80f398db6bc3a74613a6755c2517e35266a88a9739 |
