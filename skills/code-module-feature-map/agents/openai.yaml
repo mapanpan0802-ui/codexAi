@@ -1,7 +1,7 @@
 interface:
   display_name: "模块功能整理 v0.0.1"
   short_description: "整理模块功能与测试预期，生成支持新需求方案和代码修改的独立 AI 上下文"
-  default_prompt: "请使用 $code-module-feature-map 整理指定模块，在本次AI请求工作目录request_root下的docs/code-module-feature-map/<项目>/生成developer-guide.md和ai-context.md，请求环境cwd或明确AI请求路径在开始时固定，不用源码根或后续工具workdir替代，当次明确输出路径优先；源码基线source_root和源码AGENTS索引保持独立，跨目录链接按实际位置重算；人版仍仅五节，主图用名称并旁注地点，五列解析表每个地点/操作一行，多表影响用 <br> 换行，只写本功能当前步骤相关规则和实际影响；必要技术事实留AI并同步维护。"
+  default_prompt: "请使用 $code-module-feature-map 整理指定模块，在本次AI请求工作目录request_root下的docs/code-module-feature-map/<项目>/生成developer-guide.md和ai-context.md，请求环境cwd或明确AI请求路径在开始时固定，不用源码根或后续工具workdir替代，当次明确输出路径优先；源码基线source_root和源码AGENTS索引保持独立，跨目录链接按实际位置重算；人版仍仅五节，业务流程依次展示名称主图及地点旁注、流程数据库解析图、五列解析表；数据库图说明相关表的业务作用、步骤读写及已核实关联；解析表每个地点/操作一行，多表影响用 <br> 换行，业务解析与数据影响仅显示与本模块当前步骤直接相关的信息；必要技术事实留AI并同步维护。"
 policy:
   allow_implicit_invocation: false
 
